@@ -67,7 +67,7 @@ func (s *MetricServer) updateHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "Counter %s incremented by %d, new value: %d", metricName, value, newValue)
 	default:
-		mes := fmt.Sprintf("Invalid metric type", metricType)
+		mes := fmt.Sprintf("Invalid metric type %s", metricType)
 		http.Error(w, mes, http.StatusBadRequest)
 	}
 }
