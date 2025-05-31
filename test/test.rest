@@ -1,0 +1,23 @@
+### ++
+POST http://localhost:8080/update/counter/name1/50
+
+### <
+POST http://localhost:8080/update/gauge/name2/3.14
+
+### <
+POST http://localhost:8080/update/gauge/someMetric/3.15
+
+### all
+POST http://localhost:8080/metrics
+
+### ошибка http.StatusNotFound.
+POST http://localhost:8080/update/counter/527
+
+### ошибка POST only
+GET http://localhost:8080/update/counter/527
+
+### ошибка http.StatusNotFound.
+POST http://localhost:8080/update/counter/527
+
+### ошибка 
+GET http://localhost:8080/update/undo/tres/527
