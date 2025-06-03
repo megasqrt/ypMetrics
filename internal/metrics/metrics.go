@@ -65,13 +65,14 @@ func (s *MemStorage) GetMetricsByTypeAndName(mName, mType string) ([]byte, error
 		return nil, fmt.Errorf("metric '%s' of type '%s' not found", mName, mType)
 	}
 
-	response := struct {
-        Value interface{} `json:"value"`
-    }{
-        Value: value,
-    }
+	// вдруг пригодиться 
+	// response := struct {
+    //     Value interface{} `json:"value"`
+    // }{
+    //     Value: value,
+    // }
 
-	jsonData, err := json.Marshal(response)
+	jsonData, err := json.Marshal(value)
 		if err != nil {
 			return nil,fmt.Errorf("failed to marshal metric: %w", err)
 	}

@@ -74,7 +74,7 @@ func TestGetMetricHandler(t *testing.T) {
 			mName: "temperature",
 			want: want{
 				statusCode:   http.StatusOK,
-				body: `{"value":36.6}`,
+				body: `36.6`,
 			},
 		},
 		{
@@ -83,7 +83,7 @@ func TestGetMetricHandler(t *testing.T) {
 			mName: "requests",
 			want: want{
 				statusCode:   http.StatusOK,
-				body: `{"value":42}`,
+				body: `42`,
 			},
 		},
 		{

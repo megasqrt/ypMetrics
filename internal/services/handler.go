@@ -75,7 +75,7 @@ func (h *Handler) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonData)
 }
 
-func (h *Handler) metricsHtmlHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) metricsHTMLHandler(w http.ResponseWriter, r *http.Request) {
 
     metrics := h.storage.GetAllMetrics()
     

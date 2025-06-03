@@ -21,7 +21,7 @@ func NewMetricServer(storage *metrics.MemStorage) {
 
 	router.HandleFunc("/metrics", handlers.metricsHandler).Methods(http.MethodPost)
 	
-	router.HandleFunc("/", handlers.metricsHtmlHandler).Methods(http.MethodGet)
+	router.HandleFunc("/", handlers.metricsHTMLHandler).Methods(http.MethodGet)
 
 
 	if err := http.ListenAndServe(":8080", router); err != nil {

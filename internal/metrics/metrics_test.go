@@ -3,6 +3,9 @@ package metrics
 import (
 	"encoding/json"
 	"testing"
+	"strconv"
+	"unsafe"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetMetric(t *testing.T) {
@@ -64,28 +67,21 @@ func TestGetMetric(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			var result struct {
-				Value interface{} `json:"value"`
-			}
-			
-			if err := json.Unmarshal(jsonData, &result); err != nil {
-				t.Fatalf("failed to unmarshal response: %v", err)
-			}
 
-			switch v := tt.wantValue.(type) {
-			case float64:
-				if val, ok := result.Value.(float64); !ok || val != v {
-					t.Errorf("expected value %v, got %v", v, result.Value)
-				}
-			case int64:
-				if val, ok := result.Value.(float64); !ok || int64(val) != v {
-					t.Errorf("expected value %v, got %v", v, result.Value)
-				}
-			}
+			err = json.Unmarshal(jsonData, &tt.wantValue)
+			
+			assert.NoError(t, err, "Unmarshal should not fail")
+			assert.Equal(t, tt.wantValue, bytesToFloat64Fast(jsonData), "Values should be equal")
+			
 		})
 	}
 }
 
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && s[:len(substr)] == substr
+}
+
+func bytesToFloat64Fast(b []byte) (float64) {
+	value,_:=strconv.ParseFloat(unsafe.String(unsafe.SliceData(b), len(b)), 64)
+    return value
 }
