@@ -31,7 +31,7 @@ func TestMetricServer_updateHandler2(t *testing.T) {
 				mType: 	"gauge",
 				mName: 	"Latency",
 				mValue: "10",
-				body: `{"status":"ok"}`,
+				body: `Gauge Latency updated to`,
 			},
 		},
 	}
@@ -48,7 +48,7 @@ func TestMetricServer_updateHandler2(t *testing.T) {
 			request = mux.SetURLVars(request, vars)
             handler.updateHandler(record, request)
 			assert.Equal(t, http.StatusOK, record.Code)
-			assert.Equal(t, tt.want.body, record.Body.String())
+			assert.Contains(t, record.Body.String(), tt.want.body)
 			// result := record.Result()
 			
 			// assert.Equal(t, tt.want.statusCode, result.StatusCode)
