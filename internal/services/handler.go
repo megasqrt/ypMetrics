@@ -79,7 +79,7 @@ func (h *Handler) metricsHTMLHandler(w http.ResponseWriter, r *http.Request) {
 
     metrics := h.storage.GetAllMetrics()
     
-    html:= models.HtmlHead
+    html:= models.HTMLHead
 
     if gauges, ok := metrics["gauges"].(map[string]float64); ok && len(gauges) > 0 {
         html += `<div class="metric-section">

@@ -18,7 +18,7 @@ type Metrics struct {
 	Hash  string   `json:"hash,omitempty"`
 }
 
-const HtmlHead = `<!DOCTYPE html>
+const HTMLHead = `<!DOCTYPE html>
 <html>
 <head>
     <title>Metrics Dashboard</title>
