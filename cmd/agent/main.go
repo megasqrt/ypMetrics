@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"runtime"
 	"time"
+	"flag"
 )
 
 type MetricsAgent struct {
@@ -114,11 +115,27 @@ func (a *MetricsAgent) formatMetricURL(metricName string, value interface{}) str
 	}
 }
 
+var (
+	serverAddress string
+	reportInterval time.Duration
+	pollInterval time.Duration
+)
+
 func main() {
+	flag.StringVar(&serverAddress,"a", "localhost:8080", "server adress")
+	flag.DurationVar(&reportInterval,"r", 10*time.Second, "report interval")
+	flag.DurationVar(&pollInterval,"p", 2*time.Second, "poll interval")
+	
+	// flag.Usage = func() {
+    //     fmt.Fprintf(flag.CommandLine.Output(), "Version: %v\nUsage of %s:\n", version, os.Args[0])
+    //     flag.PrintDefaults()
+    // }
+	flag.Parse()
+
 	agent := NewMetricsAgent(
-		"localhost:8080",
-		2*time.Second,
-		10*time.Second,
+		serverAddress,
+		pollInterval,
+		reportInterval*time.Second,
 	)
 	agent.Run()
 
