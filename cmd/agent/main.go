@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"runtime"
 	"time"
+
+	"github.com/spf13/viper"
 )
 
 type MetricsAgent struct {
@@ -122,15 +124,34 @@ var (
 )
 
 func main() {
+	viper.AutomaticEnv() 
+    
+    envAddress := viper.GetString("ADDRESS") 
+	envReportInterval := viper.GetDuration("REPORT_INTERVAL") 
+	envPollInterval := viper.GetDuration("POLL_INTERVAL") 
+
 	flag.StringVar(&serverAddress, "a", "localhost:8080", "server adress")
 	flag.DurationVar(&reportInterval, "r", 10*time.Second, "report interval")
 	flag.DurationVar(&pollInterval, "p", 2*time.Second, "poll interval")
 
-	// flag.Usage = func() {
-	//     fmt.Fprintf(flag.CommandLine.Output(), "Version: %v\nUsage of %s:\n", version, os.Args[0])
-	//     flag.PrintDefaults()
-	// }
 	flag.Parse()
+
+
+	if envAddress != "" {
+		serverAddress = envAddress
+	}
+
+	fmt.Println(envReportInterval)
+	fmt.Println(envReportInterval)
+	if envReportInterval != 0 {
+		reportInterval = envReportInterval
+	}
+
+	if envPollInterval != 0 {
+		pollInterval = envPollInterval
+	}
+
+	fmt.Printf("start push metric to %s", serverAddress)
 
 	agent := NewMetricsAgent(
 		serverAddress,
