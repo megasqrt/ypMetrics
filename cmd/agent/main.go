@@ -117,14 +117,14 @@ func (a *MetricsAgent) formatMetricURL(metricName string, value interface{}) str
 
 var (
 	serverAddress  string
-	reportInterval time.Duration
-	pollInterval   time.Duration
+	reportInterval int
+	pollInterval   int
 )
 
 func main() {
 	flag.StringVar(&serverAddress, "a", "localhost:8080", "server adress")
-	flag.DurationVar(&reportInterval, "r", 10*time.Second, "report interval")
-	flag.DurationVar(&pollInterval, "p", 2*time.Second, "poll interval")
+	flag.IntVar(&reportInterval, "r", 10, "report interval")
+	flag.IntVar(&pollInterval, "p", 2, "poll interval")
 
 	// flag.Usage = func() {
 	//     fmt.Fprintf(flag.CommandLine.Output(), "Version: %v\nUsage of %s:\n", version, os.Args[0])
@@ -134,8 +134,8 @@ func main() {
 
 	agent := NewMetricsAgent(
 		serverAddress,
-		pollInterval,
-		reportInterval,
+		time.Duration(pollInterval)*time.Second,
+		time.Duration(reportInterval)*time.Second,
 	)
 	agent.Run()
 
