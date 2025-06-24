@@ -147,7 +147,6 @@ func main() {
 
 	flag.Parse()
 
-
 	helper.AssignIfNotEmpty(&serverAddress, envAddress)
 	helper.AssignIfNotEmpty(&reportInterval, envReportInterval)
 	helper.AssignIfNotEmpty(&pollInterval, envPollInterval)
