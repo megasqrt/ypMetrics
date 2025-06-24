@@ -10,6 +10,15 @@ POST http://localhost:8080/update/gauge/someMetric/3.15
 ### all
 POST http://localhost:8080/metrics
 
+### html
+GET http://localhost:8080/
+
+### get Some by type and name
+GET  http://localhost:8080/value/gauge/Alloc
+
+### get Some by type and name
+GET  http://localhost:8080/value/counter/PollCount
+
 ### ошибка http.StatusNotFound.
 POST http://localhost:8080/update/counter/527
 

@@ -5,10 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	//"github.com/golangci/golangci-lint/pkg/golinters/bodyclose"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
-	//"github.com/stretchr/testify/require"
 )
 
 
@@ -46,15 +44,93 @@ func TestMetricServer_updateHandler2(t *testing.T) {
 				"value": tt.want.mValue,
 			}
 			request = mux.SetURLVars(request, vars)
+			t.Log(request)
             handler.updateHandler(record, request)
+
 			assert.Equal(t, http.StatusOK, record.Code)
 			assert.Contains(t, record.Body.String(), tt.want.body)
-			// result := record.Result()
-			
-			// assert.Equal(t, tt.want.statusCode, result.StatusCode)
-            // assert.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
-
-			
 		})
 	}
 }
+
+func TestGetMetricHandler(t *testing.T) {
+	handler := NewHandler()
+	handler.storage.UpdateCounter("requests", 42)
+	handler.storage.UpdateGauge("temperature", 36.6)
+
+	type want struct {
+        statusCode  int
+		body string
+    }
+	tests := []struct {
+		name         string
+		mType	string
+		mName  string
+		want	want
+	}{
+		{
+			name: "successful gauge request",
+			mType: "gauge",
+			mName: "temperature",
+			want: want{
+				statusCode:   http.StatusOK,
+				body: `36.6`,
+			},
+		},
+		{
+			name: "successful counter request",
+			mType: "counter",
+			mName: "requests",
+			want: want{
+				statusCode:   http.StatusOK,
+				body: `42`,
+			},
+		},
+		{
+			name: "missing metric",
+			mType: "gauge",
+			mName: "humidity",
+			want: want{
+				statusCode:	http.StatusNotFound,
+				body: `ERROR Handler: metric 'humidity' of type 'gauge' not found`,
+			}, 
+		},
+		{
+			name: "invalid type",
+			mType: "invalid",
+			mName: "temperature",
+			want: want{
+				statusCode:	http.StatusNotFound,
+				body: `ERROR Handler: invalid metric type`,
+			}, 
+		},
+		{
+			name: "missing type parameter",
+			mName: "temperature",
+			want: want{
+				statusCode:	http.StatusNotFound,
+				body: `Invalid URL format`,
+			}, 
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			
+			request,_ := http.NewRequest(http.MethodGet, "/value", nil)
+			record := httptest.NewRecorder()
+			vars := map[string]string{
+				"type":  tt.mType,
+				"name":  tt.mName,
+			}
+			request = mux.SetURLVars(request, vars)
+
+			handler.getMetricHandler(record, request)
+
+			assert.Equal(t, tt.want.statusCode, record.Code)
+			assert.Contains(t, record.Body.String(), tt.want.body)
+
+		})
+	}
+}
+

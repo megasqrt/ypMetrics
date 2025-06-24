@@ -1,5 +1,11 @@
 package metrics
 
+import (
+	"errors"
+	"fmt"
+	"encoding/json"
+)
+
 type MemStorage struct {
 	gauges   map[string]float64
 	counters map[string]int64
@@ -40,4 +46,36 @@ func (s *MemStorage) GetAllMetrics() map[string]interface{} {
 	}
 	metrics["counters"] = counters
 	return metrics
+}
+
+func (s *MemStorage) GetMetricsByTypeAndName(mName, mType string) ([]byte, error) {
+	var value interface{}
+	var found bool
+
+	switch mType {
+	case "gauge":
+		value, found = s.gauges[mName]
+	case "counter":
+		value, found = s.counters[mName]
+	default:
+		return nil, errors.New("invalid metric type")
+	}
+
+	if !found {
+		return nil, fmt.Errorf("metric '%s' of type '%s' not found", mName, mType)
+	}
+
+	// вдруг пригодиться 
+	// response := struct {
+    //     Value interface{} `json:"value"`
+    // }{
+    //     Value: value,
+    // }
+
+	jsonData, err := json.Marshal(value)
+		if err != nil {
+			return nil,fmt.Errorf("failed to marshal metric: %w", err)
+	}
+
+	return jsonData, nil
 }
