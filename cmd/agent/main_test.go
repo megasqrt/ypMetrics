@@ -5,6 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+	"os"
+	"flag"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewMetricsAgent(t *testing.T) {
@@ -98,5 +101,59 @@ func TestAgentRun(t *testing.T) {
 	}
 	if _, ok := agent.metrics["RandomValue"]; !ok {
 		t.Error("Expected RandomValue to be set after agent run")
+	}
+}
+
+
+func TestFlagParsing(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	tests := []struct {
+		name            string
+		args           []string
+		wantAddress    string
+		wantReportInt  time.Duration
+		wantPollInt    time.Duration
+	}{
+		{
+			name:           "default values",
+			args:           []string{"cmd"},
+			wantAddress:    "localhost:8080",
+			wantReportInt:  10 * time.Second,
+			wantPollInt:    2 * time.Second,
+		},
+		{
+			name:           "custom values",
+			args:           []string{"cmd", "-a=127.0.0.1:9090", "-r=5s", "-p=1s"},
+			wantAddress:    "127.0.0.1:9090",
+			wantReportInt:  5 * time.Second,
+			wantPollInt:    1 * time.Second,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flag.CommandLine = flag.NewFlagSet(tt.name, flag.ContinueOnError)
+			
+			os.Args = tt.args
+			
+			var (
+				serverAddress string
+				reportInterval time.Duration
+				pollInterval   time.Duration
+			)
+			
+			flag.StringVar(&serverAddress, "a", "localhost:8080", "server address")
+			flag.DurationVar(&reportInterval, "r", 10*time.Second, "report interval")
+			flag.DurationVar(&pollInterval, "p", 2*time.Second, "poll interval")
+			
+			flag.Parse()
+			
+
+			assert.Equal(t, tt.wantAddress, serverAddress, "parameter address not pass")
+			assert.Equal(t, tt.wantReportInt, reportInterval,"parameter report not pass")
+			assert.Equal(t, tt.wantPollInt, pollInterval,"parameter poll not pass")
+		})
 	}
 }

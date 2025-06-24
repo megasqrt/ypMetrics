@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"math/rand"
@@ -114,11 +115,27 @@ func (a *MetricsAgent) formatMetricURL(metricName string, value interface{}) str
 	}
 }
 
+var (
+	serverAddress  string
+	reportInterval int
+	pollInterval   int
+)
+
 func main() {
+	flag.StringVar(&serverAddress, "a", "localhost:8080", "server adress")
+	flag.IntVar(&reportInterval, "r", 10, "report interval")
+	flag.IntVar(&pollInterval, "p", 2, "poll interval")
+
+	// flag.Usage = func() {
+	//     fmt.Fprintf(flag.CommandLine.Output(), "Version: %v\nUsage of %s:\n", version, os.Args[0])
+	//     flag.PrintDefaults()
+	// }
+	flag.Parse()
+
 	agent := NewMetricsAgent(
-		"localhost:8080",
-		2*time.Second,
-		10*time.Second,
+		serverAddress,
+		time.Duration(pollInterval)*time.Second,
+		time.Duration(reportInterval)*time.Second,
 	)
 	agent.Run()
 

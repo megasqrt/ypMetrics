@@ -6,9 +6,13 @@ import (
 	"ypMetrics/internal/metrics"
 	"net/http"
 	"github.com/gorilla/mux"
+	"flag"
 )
 
 func NewMetricServer(storage *metrics.MemStorage) {
+	serverAddress := flag.String("a", "localhost:8080", "server adress")
+	flag.Parse()
+
 	handlers := &Handler{storage: *storage}
 
 	router := mux.NewRouter()
@@ -24,7 +28,7 @@ func NewMetricServer(storage *metrics.MemStorage) {
 	router.HandleFunc("/", handlers.metricsHTMLHandler).Methods(http.MethodGet)
 
 
-	if err := http.ListenAndServe(":8080", router); err != nil {
+	if err := http.ListenAndServe(*serverAddress, router); err != nil {
 		fmt.Printf("Server error: %v\n", err)
 	}
 }
