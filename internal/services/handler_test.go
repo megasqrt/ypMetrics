@@ -35,15 +35,15 @@ func (m *MockStorage) UpdateCounter(name string, value int64) int64 {
     return 0 // Дефолтное поведение
 }
 
-func (s *MockStorage) GetMetricsByTypeAndName(mName, mType string) ([]byte, error) {
+func (m *MockStorage) GetMetricsByTypeAndName(mName, mType string) ([]byte, error) {
 	var value interface{}
 	var found bool
 
 	switch mType {
 	case "gauge":
-		value, found = s.gauges[mName]
+		value, found = m.gauges[mName]
 	case "counter":
-		value, found = s.counters[mName]
+		value, found = m.counters[mName]
 	default:
 		return nil, errors.New("invalid metric type")
 	}

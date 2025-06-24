@@ -38,7 +38,7 @@ func NewMetricServer(storage store.Storage) error{
 
 
 	if err := http.ListenAndServe(serverAddress, router); err != nil {
-		return fmt.Errorf("Server error: %v\n", err)
+		return fmt.Errorf("server error: %v", err)
 	}
 	return nil
 }

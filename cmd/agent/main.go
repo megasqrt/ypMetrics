@@ -152,7 +152,7 @@ func main() {
 	helper.AssignIfNotEmpty(&pollInterval, envPollInterval)
 
 	if !govalidator.IsURL(serverAddress) {
-    	fmt.Errorf("некорректный URL %s",serverAddress)
+    	log.Fatalf("некорректный URL %s",serverAddress)
 	}
 
 	go func() {
