@@ -4,15 +4,22 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"os"
 
 	"ypMetrics/internal/helper"
 	"ypMetrics/internal/store"
 
 	"github.com/gorilla/mux"
 	"github.com/spf13/viper"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
 )
 
 func NewMetricServer(storage store.Storage) error{
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
 	viper.AutomaticEnv() 
     var serverAddress string
     envAddress := viper.GetString("ADDRESS") 
@@ -26,7 +33,7 @@ func NewMetricServer(storage store.Storage) error{
 
 	router := mux.NewRouter()
 	fmt.Printf("Starting server on %s\n",serverAddress)
-
+	router.Use(LoggingMiddleware)
 	router.HandleFunc("/update/{type}/{value}", handlers.errorHandler).Methods(http.MethodPost)
 	router.HandleFunc("/update/{type}/{name}/{value}", handlers.updateHandler).Methods(http.MethodPost)
 	
@@ -35,7 +42,6 @@ func NewMetricServer(storage store.Storage) error{
 	router.HandleFunc("/metrics", handlers.metricsHandler).Methods(http.MethodPost)
 	
 	router.HandleFunc("/", handlers.metricsHTMLHandler).Methods(http.MethodGet)
-
 
 	if err := http.ListenAndServe(serverAddress, router); err != nil {
 		return fmt.Errorf("server error: %v", err)
