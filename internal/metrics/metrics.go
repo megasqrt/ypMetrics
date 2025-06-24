@@ -18,11 +18,11 @@ func NewMemStorage() *MemStorage {
 	}
 }
 
-type StorageInterface interface {
-	UpdateGauge(name string, value float64)
-	UpdateCounter(name string, value int64) int64
-	GetAllMetrics() map[string]interface{}
-}
+// type StorageInterface interface {
+// 	UpdateGauge(name string, value float64)
+// 	UpdateCounter(name string, value int64) int64
+// 	GetAllMetrics() map[string]interface{}
+// }
 
 func (s *MemStorage) UpdateGauge(name string, value float64) {
 	s.gauges[name] = value

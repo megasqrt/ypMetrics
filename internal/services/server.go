@@ -1,22 +1,31 @@
 package services
 
 import (
-	
-	"fmt"
-	"ypMetrics/internal/metrics"
-	"net/http"
-	"github.com/gorilla/mux"
 	"flag"
+	"fmt"
+	"net/http"
+
+	"ypMetrics/internal/helper"
+	"ypMetrics/internal/store"
+
+	"github.com/gorilla/mux"
+	"github.com/spf13/viper"
 )
 
-func NewMetricServer(storage *metrics.MemStorage) {
-	serverAddress := flag.String("a", "localhost:8080", "server adress")
+func NewMetricServer(storage store.Storage) error{
+	viper.AutomaticEnv() 
+    var serverAddress string
+    envAddress := viper.GetString("ADDRESS") 
+	flag.StringVar(&serverAddress, "a", "localhost:8080", "server adress")
+
 	flag.Parse()
 
-	handlers := &Handler{storage: *storage}
+	helper.AssignIfNotEmpty(&serverAddress,envAddress)
+
+	handlers := &Handler{storage: storage}
 
 	router := mux.NewRouter()
-	fmt.Println("Starting server on :8080")
+	fmt.Printf("Starting server on %s\n",serverAddress)
 
 	router.HandleFunc("/update/{type}/{value}", handlers.errorHandler).Methods(http.MethodPost)
 	router.HandleFunc("/update/{type}/{name}/{value}", handlers.updateHandler).Methods(http.MethodPost)
@@ -28,7 +37,8 @@ func NewMetricServer(storage *metrics.MemStorage) {
 	router.HandleFunc("/", handlers.metricsHTMLHandler).Methods(http.MethodGet)
 
 
-	if err := http.ListenAndServe(*serverAddress, router); err != nil {
-		fmt.Printf("Server error: %v\n", err)
+	if err := http.ListenAndServe(serverAddress, router); err != nil {
+		return fmt.Errorf("server error: %v", err)
 	}
+	return nil
 }

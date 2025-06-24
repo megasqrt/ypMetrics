@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -8,6 +9,12 @@ import (
 	"net/http"
 	"runtime"
 	"time"
+	"github.com/spf13/viper"
+	"os"
+	"os/signal"
+	"syscall"
+	"github.com/asaskevich/govalidator"
+	"ypMetrics/internal/helper"
 )
 
 type MetricsAgent struct {
@@ -122,22 +129,47 @@ var (
 )
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	viper.AutomaticEnv() 
+    
+    envAddress := viper.GetString("ADDRESS") 
+	envReportInterval := viper.GetInt("REPORT_INTERVAL") 
+	envPollInterval := viper.GetInt("POLL_INTERVAL") 
+
 	flag.StringVar(&serverAddress, "a", "localhost:8080", "server adress")
 	flag.IntVar(&reportInterval, "r", 10, "report interval")
 	flag.IntVar(&pollInterval, "p", 2, "poll interval")
 
-	// flag.Usage = func() {
-	//     fmt.Fprintf(flag.CommandLine.Output(), "Version: %v\nUsage of %s:\n", version, os.Args[0])
-	//     flag.PrintDefaults()
-	// }
 	flag.Parse()
 
-	agent := NewMetricsAgent(
-		serverAddress,
-		time.Duration(pollInterval)*time.Second,
-		time.Duration(reportInterval)*time.Second,
-	)
-	agent.Run()
+	helper.AssignIfNotEmpty(&serverAddress, envAddress)
+	helper.AssignIfNotEmpty(&reportInterval, envReportInterval)
+	helper.AssignIfNotEmpty(&pollInterval, envPollInterval)
 
-	select {}
+	if !govalidator.IsURL(serverAddress) {
+    	log.Fatalf("некорректный URL %s",serverAddress)
+	}
+
+	go func() {
+		fmt.Printf("start push metric to %s", serverAddress)
+
+		agent := NewMetricsAgent(
+			serverAddress,
+			time.Duration(pollInterval)*time.Second,
+			time.Duration(reportInterval)*time.Second,
+		)
+		agent.Run()
+		<-ctx.Done()
+	}()
+
+	sig := <-sigChan
+	log.Printf("Получен сигнал: %v\n", sig)
+	cancel()
 }
+
+

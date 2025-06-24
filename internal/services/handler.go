@@ -1,24 +1,25 @@
 package services
 
 import (
-	"ypMetrics/internal/metrics"
 	"encoding/json"
-	"ypMetrics/models"
-	"strconv"
-	"net/http"
-	"github.com/gorilla/mux"
 	"fmt"
 	"io"
+	"net/http"
+	"strconv"
+	"ypMetrics/internal/store"
+	"ypMetrics/models"
+
+	"github.com/gorilla/mux"
 )
 
 type Handler struct {
-	storage metrics.MemStorage
+	storage store.Storage
 }
 
-func NewHandler() Handler {
-	var h Handler
-	h.storage = *metrics.NewMemStorage()
-	return h
+func NewHandler(s store.Storage) Handler {
+	return Handler{
+		storage: s,
+	}
 }
 
 func (h *Handler) updateHandler(w http.ResponseWriter, r *http.Request) {
