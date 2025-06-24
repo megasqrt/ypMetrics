@@ -1,41 +1,26 @@
 package services
 
 import (
-	"encoding/json"
-	"fmt"
 	"ypMetrics/internal/metrics"
+	"encoding/json"
 	"ypMetrics/models"
-	"net/http"
 	"strconv"
-
+	"net/http"
 	"github.com/gorilla/mux"
+	"fmt"
 )
 
-type MetricsHandler struct{}
-
-// MetricServer представляет HTTP сервер для работы с метриками
-type MetricServer struct {
+type Handler struct {
 	storage metrics.MemStorage
 }
 
-// NewMetricServer создает новый сервер метрик
-func NewMetricServer(storage *metrics.MemStorage) *MetricServer {
-	server := &MetricServer{storage: *storage}
-
-	router := mux.NewRouter()
-	fmt.Println("Starting server on :8080")
-
-	router.HandleFunc("/update/{type}/{value}", server.errorHandler).Methods(http.MethodPost)
-	router.HandleFunc("/update/{type}/{name}/{value}", server.updateHandler).Methods(http.MethodPost)
-
-	router.HandleFunc("/metrics", server.metricsHandler).Methods(http.MethodPost)
-	if err := http.ListenAndServe(":8080", router); err != nil {
-		fmt.Printf("Server error: %v\n", err)
-	}
-	return server
+func NewHandler() Handler {
+	var h Handler
+	h.storage = *metrics.NewMemStorage()
+	return h
 }
 
-func (s *MetricServer) updateHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) updateHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
 	metricType := vars["type"]
@@ -54,7 +39,7 @@ func (s *MetricServer) updateHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid gauge value", http.StatusBadRequest)
 			return
 		}
-		s.storage.UpdateGauge(metricName, value)
+		h.storage.UpdateGauge(metricName, value)
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "Gauge %s updated to %f", metricName, value)
 	case models.Counter:
@@ -63,7 +48,7 @@ func (s *MetricServer) updateHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid counter value", http.StatusBadRequest)
 			return
 		}
-		newValue := s.storage.UpdateCounter(metricName, value)
+		newValue := h.storage.UpdateCounter(metricName, value)
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "Counter %s incremented by %d, new value: %d", metricName, value, newValue)
 	default:
@@ -72,12 +57,12 @@ func (s *MetricServer) updateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *MetricServer) errorHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) errorHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Invalid URL format", http.StatusNotFound)
 }
 
-func (s *MetricServer) metricsHandler(w http.ResponseWriter, r *http.Request) {
-	metrics := s.storage.GetAllMetrics()
+func (h *Handler) metricsHandler(w http.ResponseWriter, r *http.Request) {
+	metrics := h.storage.GetAllMetrics()
 	jsonData, err := json.MarshalIndent(metrics, "", "  ")
 	if err != nil {
 		http.Error(w, "Failed to serialize metrics", http.StatusInternalServerError)
