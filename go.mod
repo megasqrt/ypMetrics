@@ -5,6 +5,7 @@ go 1.23.0
 toolchain go1.23.9
 
 require (
+	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 	github.com/gorilla/mux v1.8.1
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0

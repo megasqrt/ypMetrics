@@ -4,11 +4,72 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
+	"errors"
+	"fmt"
+	"encoding/json"
+	"ypMetrics/internal/store"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 )
 
+type MockStorage struct {
+    store.Storage
+	gauges    map[string]float64
+    counters  map[string]int64
+	UpdateGaugeFunc func(name string, value float64) 
+	UpdateCounterFunc func(name string, value int64) int64 
+	GetMetricsByTypeAndNameFunc func(mName, mType string) ([]byte, error) 
+}
+
+func (m *MockStorage) UpdateGauge(name string,value float64){
+    if m.UpdateGaugeFunc != nil {
+        m.UpdateGaugeFunc(name,value)
+    }
+   
+}
+
+func (m *MockStorage) UpdateCounter(name string, value int64) int64 {
+    if m.UpdateCounterFunc != nil {
+        return m.UpdateCounterFunc(name, value)
+    }
+    return 0 // Дефолтное поведение
+}
+
+func (s *MockStorage) GetMetricsByTypeAndName(mName, mType string) ([]byte, error) {
+	var value interface{}
+	var found bool
+
+	switch mType {
+	case "gauge":
+		value, found = s.gauges[mName]
+	case "counter":
+		value, found = s.counters[mName]
+	default:
+		return nil, errors.New("invalid metric type")
+	}
+
+	if !found {
+		return nil, fmt.Errorf("metric '%s' of type '%s' not found", mName, mType)
+	}
+
+
+	jsonData, err := json.Marshal(value)
+		if err != nil {
+			return nil,fmt.Errorf("failed to marshal metric: %w", err)
+	}
+
+	return jsonData, nil
+}
+
+func (m *MockStorage) WithGauge(name string, value float64) *MockStorage {
+    m.gauges[name] = value
+    return m
+}
+
+func (m *MockStorage) WithCounter(name string, value int64) *MockStorage {
+    m.counters[name] = value
+    return m
+}
 
 func TestMetricServer_updateHandler2(t *testing.T) {
 	type want struct {
@@ -35,7 +96,8 @@ func TestMetricServer_updateHandler2(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := NewHandler()
+			mock := &MockStorage{}
+			handler := NewHandler(mock)
 			request,_ := http.NewRequest(http.MethodPost, "/update", nil)
 			record := httptest.NewRecorder()
 			vars := map[string]string{
@@ -54,9 +116,16 @@ func TestMetricServer_updateHandler2(t *testing.T) {
 }
 
 func TestGetMetricHandler(t *testing.T) {
-	handler := NewHandler()
-	handler.storage.UpdateCounter("requests", 42)
-	handler.storage.UpdateGauge("temperature", 36.6)
+	mock := &MockStorage{
+        gauges: map[string]float64{
+            "temperature": 36.6,
+        },
+        counters: map[string]int64{
+            "requests": 42,
+        },
+    }
+	handler := NewHandler(mock)
+
 
 	type want struct {
         statusCode  int

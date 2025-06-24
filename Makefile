@@ -6,6 +6,9 @@ run_s:
 
 run_a:
 	go run cmd/agent/main.go
+	
+test_a:
+	go run cmd/agent/
 
 build:
 	go build -o server cmd/server/main.go

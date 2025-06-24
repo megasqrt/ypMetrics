@@ -1,16 +1,18 @@
 package services
 
 import (
-	
-	"fmt"
-	"ypMetrics/internal/metrics"
-	"net/http"
-	"github.com/gorilla/mux"
 	"flag"
+	"fmt"
+	"net/http"
+
+	"ypMetrics/internal/helper"
+	"ypMetrics/internal/store"
+
+	"github.com/gorilla/mux"
 	"github.com/spf13/viper"
 )
 
-func NewMetricServer(storage *metrics.MemStorage) {
+func NewMetricServer(storage store.Storage) error{
 	viper.AutomaticEnv() 
     var serverAddress string
     envAddress := viper.GetString("ADDRESS") 
@@ -18,11 +20,9 @@ func NewMetricServer(storage *metrics.MemStorage) {
 
 	flag.Parse()
 
-	if envAddress != "" {
-		serverAddress = envAddress
-	}
+	helper.AssignIfNotEmpty(&serverAddress,envAddress)
 
-	handlers := &Handler{storage: *storage}
+	handlers := &Handler{storage: storage}
 
 	router := mux.NewRouter()
 	fmt.Printf("Starting server on %s\n",serverAddress)
@@ -38,6 +38,7 @@ func NewMetricServer(storage *metrics.MemStorage) {
 
 
 	if err := http.ListenAndServe(serverAddress, router); err != nil {
-		fmt.Printf("Server error: %v\n", err)
+		return fmt.Errorf("Server error: %v\n", err)
 	}
+	return nil
 }
