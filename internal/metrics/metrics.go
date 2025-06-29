@@ -4,18 +4,26 @@ import (
 	"errors"
 	"encoding/json"
 	"fmt"
+	"log"
+	"time"
 	"ypMetrics/models"
 )
 
 type MemStorage struct {
-	gauges   map[string]float64
-	counters map[string]int64
+	gauges         map[string]float64
+	counters       map[string]int64
+	fileStorage    FileStorer
+	storeInterval  time.Duration
+	isSyncMode     bool
 }
 
-func NewMemStorage() *MemStorage {
+func NewMemStorage(fs FileStorer, storeInterval time.Duration) *MemStorage {
 	return &MemStorage{
-		gauges:   make(map[string]float64),
-		counters: make(map[string]int64),
+		gauges:        make(map[string]float64),
+		counters:      make(map[string]int64),
+		fileStorage:   fs,
+		storeInterval: storeInterval,
+		isSyncMode:    storeInterval == 0,
 	}
 }
 
@@ -26,6 +34,13 @@ func (s *MemStorage) UpdateGauge(name string, value float64) {
 func (s *MemStorage) UpdateCounter(name string, value int64) int64 {
 	s.counters[name] += value
 	return s.counters[name]
+}
+
+func (s *MemStorage) SaveToFile() error {
+	if s.fileStorage != nil {
+		return s.fileStorage.SaveMetrics(s)
+	}
+	return nil // No file storage configured
 }
 
 func (s *MemStorage) GetAllMetrics() map[string]interface{} {
@@ -102,4 +117,31 @@ func (s *MemStorage) GetJSONMetricsByTypeAndName(mName, mType string) ([]byte, e
 		return nil, fmt.Errorf("failed to marshal metric object: %w", err)
 	}
 	return jsonData, nil
+}
+
+type FileStorer interface {
+	SaveMetrics(storage *MemStorage) error
+	LoadMetrics(storage *MemStorage) error
+}
+
+func (s *MemStorage) StartPeriodicSave() {
+	if s.fileStorage == nil || s.isSyncMode {
+		return
+	}
+
+	ticker := time.NewTicker(s.storeInterval)
+	go func() {
+		for range ticker.C {
+			if err := s.fileStorage.SaveMetrics(s); err != nil {
+				log.Printf("Error saving metrics to file: %v", err)
+			}
+		}
+	}()
+}
+
+func (s *MemStorage) LoadFromFile() error {
+	if s.fileStorage != nil {
+		return s.fileStorage.LoadMetrics(s)
+	}
+	return nil // No file storage configured
 }
