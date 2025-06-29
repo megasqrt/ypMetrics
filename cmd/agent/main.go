@@ -1,27 +1,32 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
-	"runtime"
-	"time"
-	"github.com/spf13/viper"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
+	"time"
+
 	"github.com/asaskevich/govalidator"
+	"github.com/spf13/viper"
+
 	"ypMetrics/internal/helper"
+	"ypMetrics/models"
 )
 
 type MetricsAgent struct {
 	serverAddress  string
 	pollInterval   time.Duration
 	reportInterval time.Duration
-	metrics        map[string]interface{}
+	metrics        []models.Metrics
 }
 
 func NewMetricsAgent(serverAddress string, pollInterval, reportInterval time.Duration) *MetricsAgent {
@@ -29,7 +34,7 @@ func NewMetricsAgent(serverAddress string, pollInterval, reportInterval time.Dur
 		serverAddress:  serverAddress,
 		pollInterval:   pollInterval,
 		reportInterval: reportInterval,
-		metrics:        make(map[string]interface{}),
+		// metrics:        make(map[string]interface{}),
 	}
 }
 
@@ -42,51 +47,96 @@ func (a *MetricsAgent) startPolling() {
 	ticker := time.NewTicker(a.pollInterval)
 	for range ticker.C {
 		a.collectRuntimeMetrics()
-		a.metrics["RandomValue"] = rand.Float64()
+		a.metrics= append(a.metrics, models.Metrics{
+            ID:    "RandomValue",
+            MType: "gauge",
+            Value: ptrFloat64(rand.Float64()),
+        })
 		a.incrementPollCount()
 	}
 }
 
 func (a *MetricsAgent) collectRuntimeMetrics() {
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
+    var memStats runtime.MemStats
+    runtime.ReadMemStats(&memStats)
 
-	a.metrics["Alloc"] = float64(memStats.Alloc)
-	a.metrics["BuckHashSys"] = float64(memStats.BuckHashSys)
-	a.metrics["Frees"] = float64(memStats.Frees)
-	a.metrics["GCCPUFraction"] = memStats.GCCPUFraction
-	a.metrics["GCSys"] = float64(memStats.GCSys)
-	a.metrics["HeapAlloc"] = float64(memStats.HeapAlloc)
-	a.metrics["HeapIdle"] = float64(memStats.HeapIdle)
-	a.metrics["HeapInuse"] = float64(memStats.HeapInuse)
-	a.metrics["HeapObjects"] = float64(memStats.HeapObjects)
-	a.metrics["HeapReleased"] = float64(memStats.HeapReleased)
-	a.metrics["HeapSys"] = float64(memStats.HeapSys)
-	a.metrics["LastGC"] = float64(memStats.LastGC)
-	a.metrics["Lookups"] = float64(memStats.Lookups)
-	a.metrics["MCacheInuse"] = float64(memStats.MCacheInuse)
-	a.metrics["MCacheSys"] = float64(memStats.MCacheSys)
-	a.metrics["MSpanInuse"] = float64(memStats.MSpanInuse)
-	a.metrics["MSpanSys"] = float64(memStats.MSpanSys)
-	a.metrics["Mallocs"] = float64(memStats.Mallocs)
-	a.metrics["NextGC"] = float64(memStats.NextGC)
-	a.metrics["NumForcedGC"] = float64(memStats.NumForcedGC)
-	a.metrics["NumGC"] = float64(memStats.NumGC)
-	a.metrics["OtherSys"] = float64(memStats.OtherSys)
-	a.metrics["PauseTotalNs"] = float64(memStats.PauseTotalNs)
-	a.metrics["StackInuse"] = float64(memStats.StackInuse)
-	a.metrics["StackSys"] = float64(memStats.StackSys)
-	a.metrics["Sys"] = float64(memStats.Sys)
-	a.metrics["TotalAlloc"] = float64(memStats.TotalAlloc)
+    metrics := []models.Metrics{
+		{ID: "Alloc", MType: "gauge", Value: ptrFloat64(float64(memStats.Alloc))},
+        {ID: "BuckHashSys", MType: "gauge", Value: ptrFloat64(float64(memStats.BuckHashSys))},
+        {ID: "Frees", MType: "gauge", Value: ptrFloat64(float64(memStats.Frees))},
+        {ID: "GCCPUFraction", MType: "gauge", Value: ptrFloat64(memStats.GCCPUFraction)},
+        {ID: "GCSys", MType: "gauge", Value: ptrFloat64(float64(memStats.GCSys))},
+        {ID: "HeapAlloc", MType: "gauge", Value: ptrFloat64(float64(memStats.HeapAlloc))},
+        {ID: "HeapIdle", MType: "gauge", Value: ptrFloat64(float64(memStats.HeapIdle))},
+        {ID: "HeapInuse", MType: "gauge", Value: ptrFloat64(float64(memStats.HeapInuse))},
+        {ID: "HeapObjects", MType: "gauge", Value: ptrFloat64(float64(memStats.HeapObjects))},
+        {ID: "HeapReleased", MType: "gauge", Value: ptrFloat64(float64(memStats.HeapReleased))},
+        {ID: "HeapSys", MType: "gauge", Value: ptrFloat64(float64(memStats.HeapSys))},
+        {ID: "LastGC", MType: "gauge", Value: ptrFloat64(float64(memStats.LastGC))},
+        {ID: "Lookups", MType: "gauge", Value: ptrFloat64(float64(memStats.Lookups))},
+        {ID: "MCacheInuse", MType: "gauge", Value: ptrFloat64(float64(memStats.MCacheInuse))},
+        {ID: "MCacheSys", MType: "gauge", Value: ptrFloat64(float64(memStats.MCacheSys))},
+        {ID: "MSpanInuse", MType: "gauge", Value: ptrFloat64(float64(memStats.MSpanInuse))},
+        {ID: "MSpanSys", MType: "gauge", Value: ptrFloat64(float64(memStats.MSpanSys))},
+        {ID: "Mallocs", MType: "gauge", Value: ptrFloat64(float64(memStats.Mallocs))},
+        {ID: "NextGC", MType: "gauge", Value: ptrFloat64(float64(memStats.NextGC))},
+        {ID: "NumForcedGC", MType: "gauge", Value: ptrFloat64(float64(memStats.NumForcedGC))},
+        {ID: "NumGC", MType: "gauge", Value: ptrFloat64(float64(memStats.NumGC))},
+        {ID: "OtherSys", MType: "gauge", Value: ptrFloat64(float64(memStats.OtherSys))},
+        {ID: "PauseTotalNs", MType: "gauge", Value: ptrFloat64(float64(memStats.PauseTotalNs))},
+        {ID: "StackInuse", MType: "gauge", Value: ptrFloat64(float64(memStats.StackInuse))},
+        {ID: "StackSys", MType: "gauge", Value: ptrFloat64(float64(memStats.StackSys))},
+        {ID: "Sys", MType: "gauge", Value: ptrFloat64(float64(memStats.Sys))},
+        {ID: "TotalAlloc", MType: "gauge", Value: ptrFloat64(float64(memStats.TotalAlloc))},
+    }
+
+    // Заменяем метрики runtime (очищаем старые и добавляем новые)
+    a.metrics = filterOutRuntimeMetrics(a.metrics)
+    a.metrics = append(a.metrics, metrics...)
+}
+
+func filterOutRuntimeMetrics(metrics []models.Metrics) []models.Metrics {
+    var result []models.Metrics
+    for _, m := range metrics {
+        if !isRuntimeMetric(m.ID) {
+            result = append(result, m)
+        }
+    }
+    return result
+}
+
+func isRuntimeMetric(name string) bool {
+    runtimeMetrics := []string{
+        "Alloc", "BuckHashSys", "Frees", "GCCPUFraction", "GCSys",
+        "HeapAlloc", "HeapIdle", "HeapInuse", "HeapObjects", "HeapReleased",
+        "HeapSys", "LastGC", "Lookups", "MCacheInuse", "MCacheSys",
+        "MSpanInuse", "MSpanSys", "Mallocs", "NextGC", "NumForcedGC",
+        "NumGC", "OtherSys", "PauseTotalNs", "StackInuse", "StackSys",
+        "Sys", "TotalAlloc",
+    }
+    for _, m := range runtimeMetrics {
+        if m == name {
+            return true
+        }
+    }
+    return false
 }
 
 func (a *MetricsAgent) incrementPollCount() {
-	if count, ok := a.metrics["PollCount"].(int64); ok {
-		a.metrics["PollCount"] = count + 1
-	} else {
-		a.metrics["PollCount"] = int64(1)
+	for i := range a.metrics {
+		if a.metrics[i].ID == "PollCount" && a.metrics[i].MType == "counter" {
+			if a.metrics[i].Delta != nil {
+				*a.metrics[i].Delta++
+			} else {
+				a.metrics[i].Delta = ptrInt64(1)
+			}
+			return
+		}
 	}
+	// если не нашли, добавляем новую
+	a.metrics = append(a.metrics, models.Metrics{ID: "PollCount", MType: "counter", Delta: ptrInt64(1)})
 }
+
 
 func (a *MetricsAgent) startReporting() {
 	ticker := time.NewTicker(a.reportInterval)
@@ -96,29 +146,20 @@ func (a *MetricsAgent) startReporting() {
 }
 
 func (a *MetricsAgent) sendMetrics() {
-	for name, value := range a.metrics {
-		url := a.formatMetricURL(name, value)
-		if url == "" {
-			continue // Пропускаем неподдерживаемые типы
-		}
+	for _, m := range a.metrics {
+		url := fmt.Sprintf("http://%s/update/", a.serverAddress)
+		
+		data, err := json.Marshal(m)
+        if err != nil {
+            continue
+        }
 
-		resp, err := http.Post(url, "text/plain", nil)
+		resp, err := http.Post(url, "application/json", bytes.NewBuffer(data))
 		if err != nil {
-			log.Printf("Error sending metric %s: %v", name, err)
+			log.Printf("Error sending metric %s: %v", m.ID, err)
 			continue
 		}
 		resp.Body.Close()
-	}
-}
-
-func (a *MetricsAgent) formatMetricURL(metricName string, value interface{}) string {
-	switch v := value.(type) {
-	case float64:
-		return fmt.Sprintf("http://%s/update/gauge/%s/%f", a.serverAddress, metricName, v)
-	case int64:
-		return fmt.Sprintf("http://%s/update/counter/%s/%d", a.serverAddress, metricName, v)
-	default:
-		return ""
 	}
 }
 
@@ -172,4 +213,9 @@ func main() {
 	cancel()
 }
 
-
+func ptrFloat64(v float64) *float64 {
+    return &v
+}
+func ptrInt64(v int64) *int64 {
+    return &v
+}
