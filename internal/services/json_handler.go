@@ -11,12 +11,12 @@ func (h *Handler)UpdateMetricJSON(w http.ResponseWriter, r *http.Request){
 	var m models.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-
+		return
 	}
 
 	if m.ID == "" || (m.MType != "gauge" && m.MType != "counter") {
 		http.Error(w, "invalid metric data", http.StatusBadRequest)
-
+		return
 	}
 
 	switch m.MType {
@@ -34,25 +34,30 @@ func (h *Handler)UpdateMetricJSON(w http.ResponseWriter, r *http.Request){
 		h.storage.UpdateCounter(m.ID, *m.Delta)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(m)
+	updatedMetric, err := h.storage.GetJSONMetricsByTypeAndName(m.ID, m.MType)
+	if err != nil {
+		http.Error(w, "could not retrieve updated metric", http.StatusInternalServerError)
+		return
+	}
 
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(updatedMetric)
 }
 
 func (h *Handler)GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	var m models.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
-
-	json, err := h.storage.GetMetricsByTypeAndName(m.ID,m.MType)
+	metricJSON, err := h.storage.GetJSONMetricsByTypeAndName(m.ID, m.MType)
 	
-	if err != nil{
+	if err != nil {
 		http.Error(w, "metric not found", http.StatusNotFound)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(json)
-
+	w.Write(metricJSON)
 }

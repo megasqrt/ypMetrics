@@ -7,4 +7,5 @@ type Storage interface {
 	UpdateCounter(name string, value int64) int64 
 	GetAllMetrics() map[string] interface{}
 	GetMetricsByTypeAndName(mName, mType string) ([]byte, error) 
+	GetJSONMetricsByTypeAndName(mName, mType string) ([]byte, error)
 }
