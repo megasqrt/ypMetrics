@@ -60,9 +60,8 @@ func (a *MetricsAgent) collectRuntimeMetrics() {
     var memStats runtime.MemStats
     runtime.ReadMemStats(&memStats)
 
-    // Создаем слайс метрик
     metrics := []models.Metrics{
-        {ID: "Alloc", MType: "gauge", Value: ptrFloat64(float64(memStats.Alloc))},
+		{ID: "Alloc", MType: "gauge", Value: ptrFloat64(float64(memStats.Alloc))},
         {ID: "BuckHashSys", MType: "gauge", Value: ptrFloat64(float64(memStats.BuckHashSys))},
         {ID: "Frees", MType: "gauge", Value: ptrFloat64(float64(memStats.Frees))},
         {ID: "GCCPUFraction", MType: "gauge", Value: ptrFloat64(memStats.GCCPUFraction)},
