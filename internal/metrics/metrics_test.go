@@ -2,14 +2,13 @@ package metrics
 
 import (
 	"encoding/json"
-	"testing"
-	"strconv"
-	"unsafe"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 func TestGetMetric(t *testing.T) {
-	storage := NewMemStorage()
+	storage := NewMemStorage(nil, 0)
 	storage.UpdateGauge("temperature", 36.6)
 	storage.UpdateCounter("requests", 42)
 
@@ -51,37 +50,28 @@ func TestGetMetric(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			jsonData, err := storage.GetMetricsByTypeAndName( tt.metricName,tt.metricType)
-			
+			jsonData, err := storage.GetMetricsByTypeAndName(tt.metricName, tt.metricType)
+
 			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				if tt.errContains != "" && contains(err.Error(), tt.errContains) {
-					t.Errorf("error should contain %q, got %q", tt.errContains, err.Error())
-				}
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
 				return
 			}
-			
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+
+			require.NoError(t, err)
+
+			switch v := tt.wantValue.(type) {
+			case float64:
+				var gotValue float64
+				err := json.Unmarshal(jsonData, &gotValue)
+				require.NoError(t, err)
+				assert.InDelta(t, v, gotValue, 0.001)
+			case int64:
+				var gotValue int64
+				err := json.Unmarshal(jsonData, &gotValue)
+				require.NoError(t, err)
+				assert.Equal(t, v, gotValue)
 			}
-
-
-			err = json.Unmarshal(jsonData, &tt.wantValue)
-			
-			assert.NoError(t, err, "Unmarshal should not fail")
-			assert.Equal(t, tt.wantValue, bytesToFloat64Fast(jsonData), "Values should be equal")
-			
 		})
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[:len(substr)] == substr
-}
-
-func bytesToFloat64Fast(b []byte) (float64) {
-	value,_:=strconv.ParseFloat(unsafe.String(unsafe.SliceData(b), len(b)), 64)
-    return value
 }
