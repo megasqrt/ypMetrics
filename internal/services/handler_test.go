@@ -87,7 +87,10 @@ func TestUpdateHandler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockStorage := &mocks.MockStorage{}
+			mockStorage := &mocks.MockStorage{
+				Gauges:   make(map[string]float64),
+				Counters: make(map[string]int64),
+			}
 			handler := NewHandler(mockStorage)
 			request, _ := http.NewRequest(http.MethodPost, "/update", nil)
 			record := httptest.NewRecorder()

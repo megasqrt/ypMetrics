@@ -41,3 +41,26 @@ POST http://localhost:8080/update/counter/527
 
 ### ошибка 
 GET http://localhost:8080/update/undo/tres/527
+
+
+### 
+POST  http://localhost:8080/update/
+
+{
+    
+    "id": "RandomValue",
+    "type": "gauge",
+    "value": 234.234
+
+}
+
+### 
+POST  http://localhost:8080/value/
+
+{
+    
+    "id": "RandomValue",
+    "type": "gauge"
+}
+
+

@@ -14,49 +14,91 @@ import (
 	"ypMetrics/internal/mocks"
 )
 
-func TestUpdateMetricJSON_Success(t *testing.T) {
-	type want struct {
-        statusCode  int
-		mType string
-		mName string
-		mValue string
-		metric models.Metrics
-    }
+func TestUpdateMetricJSON(t *testing.T) {
 	tests := []struct {
-		name   string
-		want   want
+		name           string
+		initialStorage *mocks.MockStorage
+		requestMetric  models.Metrics
+		expectedMetric models.Metrics
+		expectedStatus int
 	}{
 		{
-			name: "Valid Gauge",
-			want: want{
-				statusCode:        http.StatusOK,
-				mType: 	"gauge",
-				mName: 	"Latency",
-				mValue: "10",
-				metric: models.Metrics{
-					ID:    "test-gauge",
-					MType: "gauge",
-					Value: float64Ptr(123.45),
-				},
+			name: "update gauge",
+			initialStorage: &mocks.MockStorage{
+				Gauges:   make(map[string]float64),
+				Counters: make(map[string]int64),
 			},
+			requestMetric: models.Metrics{
+				ID:    "TestGauge",
+				MType: "gauge",
+				Value: float64Ptr(123.45),
+			},
+			expectedMetric: models.Metrics{
+				ID:    "TestGauge",
+				MType: "gauge",
+				Value: float64Ptr(123.45),
+			},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "update new counter",
+			initialStorage: &mocks.MockStorage{
+				Gauges:   make(map[string]float64),
+				Counters: make(map[string]int64),
+			},
+			requestMetric: models.Metrics{
+				ID:    "TestCounter",
+				MType: "counter",
+				Delta: int64Ptr(10),
+			},
+			expectedMetric: models.Metrics{
+				ID:    "TestCounter",
+				MType: "counter",
+				Delta: int64Ptr(10),
+			},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "update existing counter",
+			initialStorage: &mocks.MockStorage{
+				Gauges:   make(map[string]float64),
+				Counters: map[string]int64{"TestCounter": 20},
+			},
+			requestMetric: models.Metrics{
+				ID:    "TestCounter",
+				MType: "counter",
+				Delta: int64Ptr(5),
+			},
+			expectedMetric: models.Metrics{
+				ID:    "TestCounter",
+				MType: "counter",
+				Delta: int64Ptr(25), // 20 + 5
+			},
+			expectedStatus: http.StatusOK,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockStorage := &mocks.MockStorage{}
-			handler := &Handler{mockStorage}
-			body, _ := json.Marshal(tt.want.metric)
+			handler := NewHandler(tt.initialStorage)
+
+			body, err := json.Marshal(tt.requestMetric)
+			require.NoError(t, err)
+
 			req, err := http.NewRequest(http.MethodPost, "/update/", bytes.NewBuffer(body))
 			require.NoError(t, err)
-			
+
 			respRecord := httptest.NewRecorder()
 			handler.UpdateMetricJSON(respRecord, req)
-			
-			assert.Equal(t, http.StatusOK, respRecord.Code)
-			assert.JSONEq(t, respRecord.Body.String(), string(body))
+
+			assert.Equal(t, tt.expectedStatus, respRecord.Code)
+
+			if tt.expectedStatus == http.StatusOK {
+				expectedBody, err := json.Marshal(tt.expectedMetric)
+				require.NoError(t, err)
+				assert.JSONEq(t, string(expectedBody), respRecord.Body.String())
+			}
 		})
 	}
-	
 }
 
 func TestUpdateMetricJSON_InvalidData(t *testing.T) {
@@ -90,15 +132,84 @@ func TestUpdateMetricJSON_InvalidData(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			body, _ := json.Marshal(tt.request)
-			req, _ := http.NewRequest(http.MethodPost, "/update/", bytes.NewBuffer(body))
+			req, err := http.NewRequest(http.MethodPost, "/update/", bytes.NewBuffer(body))
+			require.NoError(t, err)
 			resp := httptest.NewRecorder()
-			
-			handler := &Handler{storage: &mocks.MockStorage{}}
+
+			handler := NewHandler(&mocks.MockStorage{})
 			handler.UpdateMetricJSON(resp, req)
-			
+
 			assert.Equal(t, tt.expected, resp.Code)
 		})
 	}
 }
 
+func TestGetMetricJSON(t *testing.T) {
+	storage := &mocks.MockStorage{
+		Gauges:   map[string]float64{"TestGauge": 99.9},
+		Counters: map[string]int64{"TestCounter": 42},
+	}
+
+	tests := []struct {
+		name           string
+		requestMetric  models.Metrics
+		expectedMetric models.Metrics
+		expectedStatus int
+	}{
+		{
+			name: "get existing gauge",
+			requestMetric: models.Metrics{
+				ID:    "TestGauge",
+				MType: "gauge",
+			},
+			expectedMetric: models.Metrics{
+				ID:    "TestGauge",
+				MType: "gauge",
+				Value: float64Ptr(99.9),
+			},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "get existing counter",
+			requestMetric: models.Metrics{
+				ID:    "TestCounter",
+				MType: "counter",
+			},
+			expectedMetric: models.Metrics{
+				ID:    "TestCounter",
+				MType: "counter",
+				Delta: int64Ptr(42),
+			},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "get nonexistent metric",
+			requestMetric: models.Metrics{
+				ID:    "NotFound",
+				MType: "gauge",
+			},
+			expectedStatus: http.StatusNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewHandler(storage)
+			body, err := json.Marshal(tt.requestMetric)
+			require.NoError(t, err)
+			req, err := http.NewRequest(http.MethodPost, "/value/", bytes.NewBuffer(body))
+			require.NoError(t, err)
+			respRecord := httptest.NewRecorder()
+			handler.GetMetricJSON(respRecord, req)
+			assert.Equal(t, tt.expectedStatus, respRecord.Code)
+			if tt.expectedStatus == http.StatusOK {
+				expectedBody, err := json.Marshal(tt.expectedMetric)
+				require.NoError(t, err)
+				assert.JSONEq(t, string(expectedBody), respRecord.Body.String())
+			}
+		})
+	}
+}
+
 func float64Ptr(v float64) *float64 { return &v }
+func int64Ptr(v int64) *int64    { return &v }
