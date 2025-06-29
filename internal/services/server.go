@@ -34,6 +34,10 @@ func NewMetricServer(storage store.Storage) error{
 	router := mux.NewRouter()
 	fmt.Printf("Starting server on %s\n",serverAddress)
 	router.Use(LoggingMiddleware)
+
+	router.HandleFunc("/update/", handlers.UpdateMetricJSON).Methods(http.MethodPost)
+    router.HandleFunc("/value/", handlers.GetMetricJSON).Methods(http.MethodPost)
+
 	router.HandleFunc("/update/{type}/{value}", handlers.errorHandler).Methods(http.MethodPost)
 	router.HandleFunc("/update/{type}/{name}/{value}", handlers.updateHandler).Methods(http.MethodPost)
 	

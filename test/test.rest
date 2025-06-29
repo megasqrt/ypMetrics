@@ -1,3 +1,14 @@
+### json update
+POST http://localhost:8080/update/
+Content-Type: application/json
+
+{
+    "id": "Alloc",
+    "type": "gauge",
+    "value": 123.45
+}
+
+
 ### ++
 POST http://localhost:8080/update/counter/name1/50
 

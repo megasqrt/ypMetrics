@@ -18,12 +18,6 @@ func NewMemStorage() *MemStorage {
 	}
 }
 
-// type StorageInterface interface {
-// 	UpdateGauge(name string, value float64)
-// 	UpdateCounter(name string, value int64) int64
-// 	GetAllMetrics() map[string]interface{}
-// }
-
 func (s *MemStorage) UpdateGauge(name string, value float64) {
 	s.gauges[name] = value
 }
@@ -65,12 +59,6 @@ func (s *MemStorage) GetMetricsByTypeAndName(mName, mType string) ([]byte, error
 		return nil, fmt.Errorf("metric '%s' of type '%s' not found", mName, mType)
 	}
 
-	// вдруг пригодиться 
-	// response := struct {
-    //     Value interface{} `json:"value"`
-    // }{
-    //     Value: value,
-    // }
 
 	jsonData, err := json.Marshal(value)
 		if err != nil {
