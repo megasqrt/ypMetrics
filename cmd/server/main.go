@@ -1,37 +1,40 @@
 package main
 
 import (
-	"os"
 	"context"
 	"flag"
 	"log"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/spf13/viper"
 	"ypMetrics/internal/helper"
 	"ypMetrics/internal/metrics"
 	"ypMetrics/internal/services"
 	"ypMetrics/internal/store"
+
+	"github.com/spf13/viper"
 )
 
 func main() {
 	viper.AutomaticEnv()
 
+	var serverAddress string
 	var storeInterval int
 	var fileStoragePath string
 	var restore bool
 
+	flag.StringVar(&serverAddress, "a", "localhost:8080", "server address")
 	flag.IntVar(&storeInterval, "i", 300, "store interval in seconds")
 	flag.StringVar(&fileStoragePath, "f", "/tmp/metrics-db.json", "file storage path")
 	flag.BoolVar(&restore, "r", true, "restore from file on start")
-	var serverAddress string
-	flag.StringVar(&serverAddress, "a", "localhost:8080", "server address")
 	flag.Parse()
 
 	helper.AssignIfNotEmpty(&storeInterval, viper.GetInt("STORE_INTERVAL"))
 	helper.AssignIfNotEmpty(&fileStoragePath, viper.GetString("FILE_STORAGE_PATH"))
+	helper.AssignIfNotEmpty(&serverAddress, viper.GetString("ADDRESS"))
+
 	if os.Getenv("RESTORE") != "" {
 		restore = viper.GetBool("RESTORE")
 	}

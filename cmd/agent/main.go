@@ -216,7 +216,7 @@ func main() {
 	}
 
 	go func() {
-		fmt.Printf("start push metric to %s", serverAddress)
+		fmt.Printf("start push metric to %s \n", serverAddress)
 
 		agent := NewMetricsAgent(
 			serverAddress,
