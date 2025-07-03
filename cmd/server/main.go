@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"log"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -17,50 +16,69 @@ import (
 	"github.com/spf13/viper"
 )
 
-func main() {
-	viper.AutomaticEnv()
+var (
+	serverAddress string
+	storeInterval int
+	fileStoragePath string
+	restore bool
+)
 
-	var serverAddress string
-	var storeInterval int
-	var fileStoragePath string
-	var restore bool
+type config struct {
+	serverAddress   string
+	storeInterval   time.Duration
+	fileStoragePath string
+	restore         bool
+}
 
+func init() {
 	flag.StringVar(&serverAddress, "a", "localhost:8080", "server address")
 	flag.IntVar(&storeInterval, "i", 300, "store interval in seconds")
 	flag.StringVar(&fileStoragePath, "f", "/tmp/metrics-db.json", "file storage path")
 	flag.BoolVar(&restore, "r", true, "restore from file on start")
+}
+
+func parseConfig() config {
 	flag.Parse()
 
-	helper.AssignIfNotEmpty(&storeInterval, viper.GetInt("STORE_INTERVAL"))
-	helper.AssignIfNotEmpty(&fileStoragePath, viper.GetString("FILE_STORAGE_PATH"))
-	helper.AssignIfNotEmpty(&serverAddress, viper.GetString("ADDRESS"))
+	viper.AutomaticEnv()
+	helper.AssignFromViperIfSet(&serverAddress, "ADDRESS", viper.GetString)
+	helper.AssignFromViperIfSet(&storeInterval, "STORE_INTERVAL", viper.GetInt)
+	helper.AssignFromViperIfSet(&fileStoragePath, "FILE_STORAGE_PATH", viper.GetString)
+	helper.AssignFromViperIfSet(&restore, "RESTORE", viper.GetBool)
 
-	if os.Getenv("RESTORE") != "" {
-		restore = viper.GetBool("RESTORE")
+	return config{
+		serverAddress:   serverAddress,
+		storeInterval:   time.Duration(storeInterval) * time.Second,
+		fileStoragePath: fileStoragePath,
+		restore:         restore,
 	}
+}
 
-	var fileStorage metrics.FileStorer
-	if fileStoragePath != "" {
-		fileStorage = store.NewFileStorage(fileStoragePath)
-	}
-	memStorage := metrics.NewMemStorage(fileStorage, time.Duration(storeInterval)*time.Second)
-
-	if fileStorage != nil && restore {
-		if err := memStorage.LoadFromFile(); err != nil {
-			log.Printf("Warning: could not load metrics from file: %v", err)
-		}
-	}
-
-	memStorage.StartPeriodicSave()
+func main() {
+	cfg := parseConfig()
 
 	// Graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	server := services.NewMetricServer(serverAddress, memStorage)
+	var fileStorage metrics.FileStorer
+	if cfg.fileStoragePath != "" {
+		fileStorage = store.NewFileStorage(cfg.fileStoragePath)
+	}
+	memStorage := metrics.NewMemStorage(fileStorage, cfg.storeInterval)
+
+	if fileStorage != nil && cfg.restore {
+		if err := memStorage.LoadFromFile(); err != nil {
+			log.Printf("Warning: could not load metrics from file: %v", err)
+		}
+	}
+
+	memStorage.StartPeriodicSave(ctx)
+
+	server := services.NewMetricServer(cfg.serverAddress, memStorage)
 
 	go func() {
-		log.Printf("Starting server on %s", serverAddress)
+		log.Printf("Starting server on %s", cfg.serverAddress)
 		if err := server.ListenAndServe(); err != nil && err != context.Canceled {
 			log.Fatalf("server error: %v", err)
 		}

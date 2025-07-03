@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"errors"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -29,11 +30,22 @@ func NewMemStorage(fs FileStorer, storeInterval time.Duration) *MemStorage {
 
 func (s *MemStorage) UpdateGauge(name string, value float64) {
 	s.gauges[name] = value
+	if s.isSyncMode {
+		if err := s.SaveToFile(); err != nil {
+			log.Printf("Error saving gauge metric synchronously: %v", err)
+		}
+	}
 }
 
 func (s *MemStorage) UpdateCounter(name string, value int64) int64 {
 	s.counters[name] += value
-	return s.counters[name]
+	newValue := s.counters[name]
+	if s.isSyncMode {
+		if err := s.SaveToFile(); err != nil {
+			log.Printf("Error saving counter metric synchronously: %v", err)
+		}
+	}
+	return newValue
 }
 
 func (s *MemStorage) SaveToFile() error {
@@ -124,16 +136,23 @@ type FileStorer interface {
 	LoadMetrics(storage *MemStorage) error
 }
 
-func (s *MemStorage) StartPeriodicSave() {
+func (s *MemStorage) StartPeriodicSave(ctx context.Context) {
 	if s.fileStorage == nil || s.isSyncMode {
 		return
 	}
 
 	ticker := time.NewTicker(s.storeInterval)
 	go func() {
-		for range ticker.C {
-			if err := s.fileStorage.SaveMetrics(s); err != nil {
-				log.Printf("Error saving metrics to file: %v", err)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if err := s.fileStorage.SaveMetrics(s); err != nil {
+					log.Printf("Error saving metrics to file: %v", err)
+				}
+			case <-ctx.Done():
+				log.Println("Stopping periodic save due to context cancellation.")
+				return
 			}
 		}
 	}()

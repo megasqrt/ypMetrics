@@ -105,21 +105,18 @@ func filterOutRuntimeMetrics(metrics []models.Metrics) []models.Metrics {
     return result
 }
 
+var runtimeMetricNames = map[string]struct{}{
+	"Alloc": {}, "BuckHashSys": {}, "Frees": {}, "GCCPUFraction": {}, "GCSys": {},
+	"HeapAlloc": {}, "HeapIdle": {}, "HeapInuse": {}, "HeapObjects": {}, "HeapReleased": {},
+	"HeapSys": {}, "LastGC": {}, "Lookups": {}, "MCacheInuse": {}, "MCacheSys": {},
+	"MSpanInuse": {}, "MSpanSys": {}, "Mallocs": {}, "NextGC": {}, "NumForcedGC": {},
+	"NumGC": {}, "OtherSys": {}, "PauseTotalNs": {}, "StackInuse": {}, "StackSys": {},
+	"Sys": {}, "TotalAlloc": {},
+}
+
 func isRuntimeMetric(name string) bool {
-    runtimeMetrics := []string{
-        "Alloc", "BuckHashSys", "Frees", "GCCPUFraction", "GCSys",
-        "HeapAlloc", "HeapIdle", "HeapInuse", "HeapObjects", "HeapReleased",
-        "HeapSys", "LastGC", "Lookups", "MCacheInuse", "MCacheSys",
-        "MSpanInuse", "MSpanSys", "Mallocs", "NextGC", "NumForcedGC",
-        "NumGC", "OtherSys", "PauseTotalNs", "StackInuse", "StackSys",
-        "Sys", "TotalAlloc",
-    }
-    for _, m := range runtimeMetrics {
-        if m == name {
-            return true
-        }
-    }
-    return false
+	_, ok := runtimeMetricNames[name]
+	return ok
 }
 
 func (a *MetricsAgent) incrementPollCount() {
@@ -188,40 +185,54 @@ var (
 	pollInterval   int
 )
 
+type config struct {
+	serverAddress  string
+	pollInterval   time.Duration
+	reportInterval time.Duration
+}
+
+func init() {
+	flag.StringVar(&serverAddress, "a", "localhost:8080", "server adress")
+	flag.IntVar(&reportInterval, "r", 10, "report interval")
+	flag.IntVar(&pollInterval, "p", 2, "poll interval")
+}
+
+func parseConfig() config {
+	flag.Parse()
+
+	viper.AutomaticEnv()
+
+	helper.AssignFromViperIfSet(&serverAddress, "ADDRESS", viper.GetString)
+	helper.AssignFromViperIfSet(&reportInterval, "REPORT_INTERVAL", viper.GetInt)
+	helper.AssignFromViperIfSet(&pollInterval, "POLL_INTERVAL", viper.GetInt)
+	
+	if !govalidator.IsURL(serverAddress) {
+		log.Fatalf("некорректный URL %s", serverAddress)
+	}
+
+	return config{
+		serverAddress:  serverAddress,
+		reportInterval: time.Duration(reportInterval) * time.Second,
+		pollInterval:   time.Duration(pollInterval) * time.Second,
+	}
+}
+
 func main() {
+	cfg := parseConfig()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	viper.AutomaticEnv() 
-    
-    envAddress := viper.GetString("ADDRESS") 
-	envReportInterval := viper.GetInt("REPORT_INTERVAL") 
-	envPollInterval := viper.GetInt("POLL_INTERVAL") 
-
-	flag.StringVar(&serverAddress, "a", "localhost:8080", "server adress")
-	flag.IntVar(&reportInterval, "r", 10, "report interval")
-	flag.IntVar(&pollInterval, "p", 2, "poll interval")
-
-	flag.Parse()
-
-	helper.AssignIfNotEmpty(&serverAddress, envAddress)
-	helper.AssignIfNotEmpty(&reportInterval, envReportInterval)
-	helper.AssignIfNotEmpty(&pollInterval, envPollInterval)
-
-	if !govalidator.IsURL(serverAddress) {
-    	log.Fatalf("некорректный URL %s",serverAddress)
-	}
-
 	go func() {
-		fmt.Printf("start push metric to %s \n", serverAddress)
+		fmt.Printf("start push metric to %s \n", cfg.serverAddress)
 
 		agent := NewMetricsAgent(
-			serverAddress,
-			time.Duration(pollInterval)*time.Second,
-			time.Duration(reportInterval)*time.Second,
+			cfg.serverAddress,
+			cfg.pollInterval,
+			cfg.reportInterval,
 		)
 		agent.Run()
 		<-ctx.Done()
