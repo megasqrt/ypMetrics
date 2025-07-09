@@ -35,8 +35,7 @@ func parseConfig() config {
 	flag.IntVar(&storeInterval, "i", 300, "store interval in seconds")
 	flag.StringVar(&cfg.fileStoragePath, "f", "/tmp/metrics-db.json", "file storage path")
 	flag.BoolVar(&cfg.restore, "r", true, "restore from file on start")
-	flag.StringVar(&cfg.databaseDSN, "d", "host=127.0.0.1 user=metric password=metric dbname=metric sslmode=disable", "database DSN")
-
+	flag.StringVar(&cfg.databaseDSN, "d", "", "database DSN")
 	flag.Parse()
 
 	viper.AutomaticEnv()
@@ -57,14 +56,15 @@ func main() {
 	defer stop()
 
 	db, err := sql.Open("pgx", cfg.databaseDSN)
-    if err != nil {
-        log.Fatalf("Failed to connect to the database: %v", err)
-    }
-	if err := db.PingContext(ctx); err != nil {
+	if err != nil {
+		log.Fatalf("Failed to connect to the database: %v", err)
+	}
+
+	if err := db.PingContext(ctx); err != nil && cfg.databaseDSN!="" {
 		log.Fatalf("cannot connect to db: %v", err)
 	}
-    defer db.Close()
-
+	defer db.Close()
+		
 	var fileStorage metrics.FileStorer
 	if cfg.fileStoragePath != "" {
 		fileStorage = store.NewFileStorage(cfg.fileStoragePath)
