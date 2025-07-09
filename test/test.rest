@@ -64,3 +64,9 @@ POST  http://localhost:8080/value/
 }
 
 
+### 
+GET  http://localhost:8080/value/counter/testSetGet12
+
+### get_unknown
+GET http://localhost:8080/value/gauge/testUnknown251
+

@@ -14,13 +14,9 @@ import (
 	"ypMetrics/internal/store"
 
 	"github.com/spf13/viper"
-)
 
-var (
-	serverAddress string
-	storeInterval int
-	fileStoragePath string
-	restore bool
+	"database/sql"
+    _ "github.com/jackc/pgx/v5/stdlib"
 )
 
 type config struct {
@@ -28,30 +24,29 @@ type config struct {
 	storeInterval   time.Duration
 	fileStoragePath string
 	restore         bool
-}
-
-func init() {
-	flag.StringVar(&serverAddress, "a", "localhost:8080", "server address")
-	flag.IntVar(&storeInterval, "i", 300, "store interval in seconds")
-	flag.StringVar(&fileStoragePath, "f", "/tmp/metrics-db.json", "file storage path")
-	flag.BoolVar(&restore, "r", true, "restore from file on start")
+	databaseDSN     string	
 }
 
 func parseConfig() config {
+	var cfg config
+	var storeInterval int
+
+	flag.StringVar(&cfg.serverAddress, "a", "localhost:8080", "server address")
+	flag.IntVar(&storeInterval, "i", 300, "store interval in seconds")
+	flag.StringVar(&cfg.fileStoragePath, "f", "/tmp/metrics-db.json", "file storage path")
+	flag.BoolVar(&cfg.restore, "r", true, "restore from file on start")
+	flag.StringVar(&cfg.databaseDSN, "d", "host=127.0.0.1 user=metric password=metric dbname=metric sslmode=disable", "database DSN")
+
 	flag.Parse()
 
 	viper.AutomaticEnv()
-	helper.AssignFromViperIfSet(&serverAddress, "ADDRESS", viper.GetString)
+	helper.AssignFromViperIfSet(&cfg.serverAddress, "ADDRESS", viper.GetString)
 	helper.AssignFromViperIfSet(&storeInterval, "STORE_INTERVAL", viper.GetInt)
-	helper.AssignFromViperIfSet(&fileStoragePath, "FILE_STORAGE_PATH", viper.GetString)
-	helper.AssignFromViperIfSet(&restore, "RESTORE", viper.GetBool)
-
-	return config{
-		serverAddress:   serverAddress,
-		storeInterval:   time.Duration(storeInterval) * time.Second,
-		fileStoragePath: fileStoragePath,
-		restore:         restore,
-	}
+	helper.AssignFromViperIfSet(&cfg.fileStoragePath, "FILE_STORAGE_PATH", viper.GetString)
+	helper.AssignFromViperIfSet(&cfg.restore, "RESTORE", viper.GetBool)
+	helper.AssignFromViperIfSet(&cfg.databaseDSN, "DATABASE_DSN", viper.GetString)
+	
+	return cfg
 }
 
 func main() {
@@ -60,6 +55,15 @@ func main() {
 	// Graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	db, err := sql.Open("pgx", cfg.databaseDSN)
+    if err != nil {
+        log.Fatalf("Failed to connect to the database: %v", err)
+    }
+	if err := db.PingContext(ctx); err != nil {
+		log.Fatalf("cannot connect to db: %v", err)
+	}
+    defer db.Close()
 
 	var fileStorage metrics.FileStorer
 	if cfg.fileStoragePath != "" {
@@ -75,7 +79,7 @@ func main() {
 
 	memStorage.StartPeriodicSave(ctx)
 
-	server := services.NewMetricServer(cfg.serverAddress, memStorage)
+	server := services.NewMetricServer(cfg.serverAddress, memStorage, db)
 
 	go func() {
 		log.Printf("Starting server on %s", cfg.serverAddress)
@@ -87,6 +91,12 @@ func main() {
 	<-ctx.Done()
 	log.Println("Shutting down server...")
 	server.Shutdown(context.Background())
+
+	log.Println("Closing database connection...")
+	if err := db.Close(); err != nil {
+		log.Printf("Error closing database connection: %v", err)
+	}
+	log.Println("Database connection closed.")
 
 	if fileStorage != nil {
 		if err := memStorage.SaveToFile(); err != nil {

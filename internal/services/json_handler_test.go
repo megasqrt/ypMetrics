@@ -79,7 +79,7 @@ func TestUpdateMetricJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := NewHandler(tt.initialStorage)
+			handler := NewHandler(tt.initialStorage, nil)
 
 			body, err := json.Marshal(tt.requestMetric)
 			require.NoError(t, err)
@@ -135,8 +135,8 @@ func TestUpdateMetricJSON_InvalidData(t *testing.T) {
 			req, err := http.NewRequest(http.MethodPost, "/update/", bytes.NewBuffer(body))
 			require.NoError(t, err)
 			resp := httptest.NewRecorder()
-
-			handler := NewHandler(&mocks.MockStorage{})
+			
+			handler := NewHandler(&mocks.MockStorage{}, nil)
 			handler.UpdateMetricJSON(resp, req)
 
 			assert.Equal(t, tt.expected, resp.Code)
@@ -194,7 +194,7 @@ func TestGetMetricJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := NewHandler(storage)
+			handler := NewHandler(storage, nil)
 			body, err := json.Marshal(tt.requestMetric)
 			require.NoError(t, err)
 			req, err := http.NewRequest(http.MethodPost, "/value/", bytes.NewBuffer(body))
