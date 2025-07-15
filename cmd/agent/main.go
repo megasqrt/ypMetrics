@@ -240,7 +240,7 @@ type config struct {
 	pollInterval   time.Duration
 	reportInterval time.Duration
 }
-
+	
 func init() {
 	flag.StringVar(&serverAddress, "a", "localhost:8080", "server adress")
 	flag.IntVar(&reportInterval, "r", 10, "report interval")
