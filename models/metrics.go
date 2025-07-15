@@ -53,3 +53,11 @@ const HTMLHead = `<!DOCTYPE html>
 </head>
 <body>
     <h1>Metrics Dashboard</h1>`
+
+type RetriableError struct {
+	error
+}
+
+func NewRetriableError(err error) RetriableError {
+	return RetriableError{err}
+}
