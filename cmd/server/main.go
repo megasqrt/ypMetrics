@@ -90,7 +90,7 @@ func main() {
 	go func() {
 		log.Printf("Starting server on %s", cfg.serverAddress)
 		if err := server.ListenAndServe(); err != nil && err != context.Canceled {
-			log.Fatalf("server error: %v", err)
+			log.Fatalf("server error: %v", err) //  Check for http.ErrServerClosed
 		}
 	}()
 

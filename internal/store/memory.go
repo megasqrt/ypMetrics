@@ -47,7 +47,9 @@ func (s *MemStorage) UpdateGauge(name string, value float64) {
 	defer s.mu.Unlock()
 	s.gauges[name] = value
 	if s.syncSave {
-		s.saveToFile()
+		if err := s.saveToFileUnlocked(); err != nil {
+			log.Printf("error saving to file on gauge update: %v", err)
+		}
 	}
 }
 
@@ -57,7 +59,9 @@ func (s *MemStorage) UpdateCounter(name string, value int64) int64 {
 	s.counters[name] += value
 	newValue := s.counters[name]
 	if s.syncSave {
-		s.saveToFile()
+		if err := s.saveToFileUnlocked(); err != nil {
+			log.Printf("error saving to file on counter update: %v", err)
+		}
 	}
 	return newValue
 }
@@ -142,7 +146,7 @@ func (s *MemStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
 	}
 
 	if s.syncSave {
-		return s.saveToFile()
+		return s.saveToFileUnlocked()
 	}
 
 	return nil
@@ -186,20 +190,29 @@ func (s *MemStorage) SaveOnExit() {
 	}
 }
 
-func (s *MemStorage) saveToFile() error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+func (s *MemStorage) saveToFileUnlocked() error {
 	if s.filePath == "" {
 		return nil
 	}
 
-	data, err := json.Marshal(s.GetAllMetrics())
+	// Manually construct data to avoid calling another method that locks
+	allMetrics := map[string]interface{}{
+		"gauges":    s.gauges,
+		"counters": s.counters,
+	}
+
+	data, err := json.Marshal(allMetrics)
 	if err != nil {
 		return err
 	}
 
 	return os.WriteFile(s.filePath, data, 0666)
+}
+
+func (s *MemStorage) saveToFile() error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.saveToFileUnlocked()
 }
 
 func (s *MemStorage) loadFromFile() error {
