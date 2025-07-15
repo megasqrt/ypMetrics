@@ -1,10 +1,10 @@
 
-#ADDRESS=localhost:8080
-#REPORT_INTERVAL=5
-#POLL_INTERVAL=1
-#DATABASE_DSN = host=127.0.0.1 user=metric password=metric dbname=metric sslmode=disable
+ADDRESS=localhost:8080
+REPORT_INTERVAL=5
+POLL_INTERVAL=1
+DATABASE_DSN = host=127.0.0.1 user=metric password=metric dbname=metric sslmode=disable
 	
-#export
+export
 
 ITER = 11
 
@@ -12,10 +12,6 @@ echo:
 	go version
 
 run_s:
-#	@echo $$ADDRESS
-#	@echo $$REPORT_INTERVAL
-#	@echo $$POLL_INTERVAL
-#	@echo $$DATABASE_DSN
 	go run cmd/server/main.go
 
 run_a:
@@ -28,8 +24,8 @@ test_all: build
 		done
 
 test_iter: build
-	./metricstest -test.v -test.run="^TestIteration$(i)$$" -agent-binary-path=./agent -binary-path=./server -source-path=.;
-#	./metricstest -test.v -test.run="^TestIteration$(i)$$" -agent-binary-path=./agent -binary-path=./server -server-port=8080 -database-dsn="$$DATABASE_DSN" -source-path=.; \
+#	./metricstest -test.v -test.run="^TestIteration$(i)$$" -agent-binary-path=./agent -binary-path=./server -source-path=.;
+	./metricstest -test.v -test.run="^TestIteration$(i)$$" -agent-binary-path=./agent -binary-path=./server -server-port=8080 -database-dsn="$$DATABASE_DSN" -source-path=.; \
 		
 
 tests_local:

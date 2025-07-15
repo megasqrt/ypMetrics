@@ -22,6 +22,7 @@ func NewMetricServer(address string, s store.Storage) *http.Server {
 
 
 	router.HandleFunc("/update/", handlers.UpdateMetricJSON).Methods(http.MethodPost)
+	router.HandleFunc("/updates/", handlers.UpdateMetricsBatchJSON).Methods(http.MethodPost)
     router.HandleFunc("/value/", handlers.GetMetricJSON).Methods(http.MethodPost)
 
 	router.HandleFunc("/update/{type}/{value}", handlers.errorHandler).Methods(http.MethodPost)
