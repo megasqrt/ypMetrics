@@ -12,8 +12,6 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgerrcode"
 
 )
 
@@ -222,16 +220,7 @@ func (s *DBStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			if pgerrcode.IsConnectionException(pgErr.Code) {
-				return models.NewRetriableError(fmt.Errorf("database connection error (retriable): %w", err))
-			}
-		}
-		return err
-	}
-	return nil
+	return tx.Commit()
 }
 
 func (s *DBStorage) Ping(ctx context.Context) error {

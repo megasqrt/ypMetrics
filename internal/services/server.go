@@ -18,7 +18,7 @@ func NewMetricServer(address string, s store.Storage) *http.Server {
 	handlers := NewHandler(s)
 
 	router := mux.NewRouter()
-	router.Use(LoggingMiddleware,GzipMiddleware,RetryMiddleware)
+	router.Use(LoggingMiddleware,GzipMiddleware)
 
 
 	router.HandleFunc("/update/", handlers.UpdateMetricJSON).Methods(http.MethodPost)

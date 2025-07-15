@@ -57,7 +57,3 @@ const HTMLHead = `<!DOCTYPE html>
 type RetriableError struct {
 	error
 }
-
-func NewRetriableError(err error) RetriableError {
-	return RetriableError{err}
-}
