@@ -48,8 +48,8 @@ func (s *DBStorage) initSchema() error {
 
 func (s *DBStorage) UpdateGauge(name string, value float64) {
 	query := `
-    INSERT INTO metrics (id, type, value)
-    VALUES ($1, 'gauge', $2)
+    INSERT INTO gauges (id, value)
+    VALUES ($1, $2)
     ON CONFLICT (id) DO UPDATE SET value = $2;
     `
 	_, err := s.db.Exec(query, name, value)
@@ -60,10 +60,10 @@ func (s *DBStorage) UpdateGauge(name string, value float64) {
 
 func (s *DBStorage) UpdateCounter(name string, value int64) int64 {
 	query := `
-    INSERT INTO metrics (id, type, delta)
-    VALUES ($1, 'counter', $2)
-    ON CONFLICT (id) DO UPDATE SET delta = metrics.delta + $2
-    RETURNING delta;
+    INSERT INTO counters (id, value)
+    VALUES ($1, $2)
+    ON CONFLICT (id) DO UPDATE SET value = counters.value + $2
+    RETURNING value;
     `
 	var newDelta int64
 	err := s.db.QueryRow(query, name, value).Scan(&newDelta)
@@ -78,25 +78,43 @@ func (s *DBStorage) GetAllMetrics() map[string]interface{} {
 	gauges := make(map[string]float64)
 	counters := make(map[string]int64)
 
-	rows, err := s.db.Query("SELECT id, type, delta, value FROM metrics")
+	// Запрос для gauges
+	gaugeRows, err := s.db.Query("SELECT id, value FROM gauges")
 	if err != nil {
-		log.Printf("Error getting all metrics from DB: %v", err)
-		return map[string]interface{}{}
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id, mtype string
-		var delta sql.NullInt64
-		var value sql.NullFloat64
-		if err := rows.Scan(&id, &mtype, &delta, &value); err != nil {
-			log.Printf("Error scanning metric row: %v", err)
-			continue
+		log.Printf("Error getting gauges from DB: %v", err)
+	} else {
+		defer gaugeRows.Close()
+		for gaugeRows.Next() {
+			var id string
+			var value float64
+			if err := gaugeRows.Scan(&id, &value); err != nil {
+				log.Printf("Error scanning gauge row: %v", err)
+				continue
+			}
+			gauges[id] = value
 		}
-		if mtype == models.Gauge && value.Valid {
-			gauges[id] = value.Float64
-		} else if mtype == models.Counter && delta.Valid {
-			counters[id] = delta.Int64
+		if err := gaugeRows.Err(); err != nil {
+			log.Printf("Error during gauge rows iteration: %v", err)
+		}
+	}
+
+	// Запрос для counters
+	counterRows, err := s.db.Query("SELECT id, value FROM counters")
+	if err != nil {
+		log.Printf("Error getting counters from DB: %v", err)
+	} else {
+		defer counterRows.Close()
+		for counterRows.Next() {
+			var id string
+			var value int64
+			if err := counterRows.Scan(&id, &value); err != nil {
+				log.Printf("Error scanning counter row: %v", err)
+				continue
+			}
+			counters[id] = value
+		}
+		if err := counterRows.Err(); err != nil {
+			log.Printf("Error during counter rows iteration: %v", err)
 		}
 	}
 
@@ -110,7 +128,7 @@ func (s *DBStorage) GetMetricsByTypeAndName(name, mtype string) ([]byte, error) 
 	switch mtype {
 	case models.Gauge:
 		var value sql.NullFloat64
-		err := s.db.QueryRow("SELECT value FROM metrics WHERE id = $1 AND type = 'gauge'", name).Scan(&value)
+		err := s.db.QueryRow("SELECT value FROM gauges WHERE id = $1", name).Scan(&value)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				return nil, fmt.Errorf("metric '%s' of type 'gauge' not found", name)
@@ -122,7 +140,7 @@ func (s *DBStorage) GetMetricsByTypeAndName(name, mtype string) ([]byte, error) 
 		}
 	case models.Counter:
 		var delta sql.NullInt64
-		err := s.db.QueryRow("SELECT delta FROM metrics WHERE id = $1 AND type = 'counter'", name).Scan(&delta)
+		err := s.db.QueryRow("SELECT value FROM counters WHERE id = $1", name).Scan(&delta)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				return nil, fmt.Errorf("metric '%s' of type 'counter' not found", name)
@@ -146,13 +164,13 @@ func (s *DBStorage) GetJSONMetricsByTypeAndName(name, mtype string) ([]byte, err
 	switch mtype {
 	case models.Gauge:
 		var value float64
-		if err := s.db.QueryRow("SELECT value FROM metrics WHERE id = $1 AND type = 'gauge'", name).Scan(&value); err == nil {
+		if err := s.db.QueryRow("SELECT value FROM gauges WHERE id = $1", name).Scan(&value); err == nil {
 			metric.Value = &value
 			return json.Marshal(metric)
 		}
 	case models.Counter:
 		var delta int64
-		if err := s.db.QueryRow("SELECT delta FROM metrics WHERE id = $1 AND type = 'counter'", name).Scan(&delta); err == nil {
+		if err := s.db.QueryRow("SELECT value FROM counters WHERE id = $1", name).Scan(&delta); err == nil {
 			metric.Delta = &delta
 			return json.Marshal(metric)
 		}
@@ -168,7 +186,7 @@ func (s *DBStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
 	defer tx.Rollback()
 
 	gaugeStmt, err := tx.PrepareContext(context.Background(), `
-        INSERT INTO metrics (id, type, value) VALUES ($1, 'gauge', $2)
+        INSERT INTO gauges (id, value) VALUES ($1, $2)
         ON CONFLICT (id) DO UPDATE SET value = EXCLUDED.value;
     `)
 	if err != nil {
@@ -177,8 +195,8 @@ func (s *DBStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
 	defer gaugeStmt.Close()
 
 	counterStmt, err := tx.PrepareContext(context.Background(), `
-        INSERT INTO metrics (id, type, delta) VALUES ($1, 'counter', $2)
-        ON CONFLICT (id) DO UPDATE SET delta = metrics.delta + EXCLUDED.delta;
+        INSERT INTO counters (id, value) VALUES ($1, $2)
+        ON CONFLICT (id) DO UPDATE SET value = counter.value + EXCLUDED.value;
     `)
 	if err != nil {
 		return fmt.Errorf("failed to prepare counter statement: %w", err)
@@ -208,4 +226,3 @@ func (s *DBStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
 func (s *DBStorage) Ping(ctx context.Context) error {
 	return s.db.PingContext(ctx)
 }
-
