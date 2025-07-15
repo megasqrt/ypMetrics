@@ -195,7 +195,6 @@ func (s *MemStorage) saveToFileUnlocked() error {
 		return nil
 	}
 
-	// Manually construct data to avoid calling another method that locks
 	allMetrics := map[string]interface{}{
 		"gauges":    s.gauges,
 		"counters": s.counters,
