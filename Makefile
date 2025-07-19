@@ -2,11 +2,10 @@
 ADDRESS=localhost:8080
 REPORT_INTERVAL=5
 POLL_INTERVAL=1
-DATABASE_DSN = host=127.0.0.1 user=metric password=metric dbname=metric sslmode=disable
-	
-export
+DATABASE_DSN = host=127.0.0.1 user=metric password=metric dbname=metric sslmode=disable	
+#export
 
-ITER = 11
+ITER = 13
 
 echo:
 	go version
@@ -26,7 +25,6 @@ test_all: build
 test_iter: build
 #	./metricstest -test.v -test.run="^TestIteration$(i)$$" -agent-binary-path=./agent -binary-path=./server -source-path=.;
 	./metricstest -test.v -test.run="^TestIteration$(i)$$" -agent-binary-path=./agent -binary-path=./server -server-port=8080 -database-dsn="$$DATABASE_DSN" -source-path=.; \
-		
 
 tests_local:
 	go vet -vettool=$(which statictest) ./...
