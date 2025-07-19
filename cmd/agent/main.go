@@ -146,77 +146,55 @@ func (a *MetricsAgent) startReporting() {
 	}
 }
 
-func (a *MetricsAgent) sendMetrics() {
-	for _, m := range a.metrics {
-		url := fmt.Sprintf("http://%s/update/", a.serverAddress)
-
-		data, err := json.Marshal(m)
-		if err != nil {
-			continue
-		}
-
-		var buf bytes.Buffer
-		gz := gzip.NewWriter(&buf)
-		if _, err := gz.Write(data); err != nil {
-			log.Printf("Error compressing data for metric %s: %v", m.ID, err)
-			continue
-		}
-		if err := gz.Close(); err != nil {
-			log.Printf("Error closing gzip writer for metric %s: %v", m.ID, err)
-			continue
-		}
-
-		req, err := http.NewRequest(http.MethodPost, url, &buf)
-		if err != nil {
-			log.Printf("Error creating request for metric %s: %v", m.ID, err)
-			continue
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Content-Encoding", "gzip")
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			log.Printf("Error sending metric %s: %v", m.ID, err)
-			continue
-		}
-		resp.Body.Close()
-	}
-}
-
-func (a *MetricsAgent) sendMetricsBatch() {
-	url := fmt.Sprintf("http://%s/updates/", a.serverAddress)
-
-	data, err := json.Marshal(a.metrics)
+func sendGzippedJSON(url string, data interface{}) error {
+	jsonData, err := json.Marshal(data)
 	if err != nil {
-		log.Printf("Error marshaling metrics: %v", err)
-		return
+		return fmt.Errorf("ошибка маршалинга данных: %w", err)
 	}
 
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
-	if _, err := gz.Write(data); err != nil {
-		log.Printf("Error compressing data: %v", err)
-		return
+	if _, err := gz.Write(jsonData); err != nil {
+		gz.Close()
+		return fmt.Errorf("ошибка сжатия данных: %w", err)
 	}
 	if err := gz.Close(); err != nil {
-		log.Printf("Error closing gzip writer: %v", err)
-		return
+		return fmt.Errorf("ошибка закрытия gzip writer: %w", err)
 	}
 
 	req, err := http.NewRequest(http.MethodPost, url, &buf)
 	if err != nil {
-		log.Printf("Error creating request: %v", err)
-		return
+		return fmt.Errorf("ошибка создания запроса: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Printf("Error sending metrics batch: %v", err)
-		return
+		return fmt.Errorf("ошибка отправки запроса: %w", err)
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("сервер вернул статус не-OK: %s", resp.Status)
+	}
+	return nil
+}
+
+func (a *MetricsAgent) sendMetrics() {
+	for _, m := range a.metrics {
+		url := fmt.Sprintf("http://%s/update/", a.serverAddress)
+		if err := sendGzippedJSON(url, m); err != nil {
+			log.Printf("Ошибка отправки метрики %s: %v", m.ID, err)
+		}
+	}
+}
+
+func (a *MetricsAgent) sendMetricsBatch() {
+	url := fmt.Sprintf("http://%s/updates/", a.serverAddress)
+	if err := sendGzippedJSON(url, a.metrics); err != nil {
+		log.Printf("Ошибка отправки пакета метрик: %v", err)
+	}
 }
 
 func (a *MetricsAgent) pingServer() bool {
