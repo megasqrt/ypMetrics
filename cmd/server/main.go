@@ -11,6 +11,8 @@ import (
 	"ypMetrics/internal/helper"
 	"ypMetrics/internal/services"
 	"ypMetrics/internal/store"
+	"ypMetrics/internal/misc"
+
 
 	"github.com/spf13/viper"
 
@@ -18,13 +20,6 @@ import (
     _ "github.com/jackc/pgx/v5/stdlib"
 )
 
-type config struct {
-	serverAddress   string
-	storeInterval   time.Duration
-	fileStoragePath string
-	restore         bool
-	databaseDSN     string	
-}
 
 const (
 	defaultServerAddress   = "localhost:8080"
@@ -32,27 +27,30 @@ const (
 	defaultFileStoragePath = "/tmp/metrics-db.json"
 	defaultRestore         = true
 	defaultDatabaseDSN     = ""
+	defaultHashKey		   = ""
 )
 
-func parseConfig() config {
-	var cfg config
+func parseConfig() misc.Config {
+	var cfg misc.Config
 	var storeInterval int
 
-	flag.StringVar(&cfg.serverAddress, "a", defaultServerAddress, "server address")
+	flag.StringVar(&cfg.ServerAddress, "a", defaultServerAddress, "server address")
 	flag.IntVar(&storeInterval, "i", int(defaultStoreInterval), "store interval in seconds")
-	flag.StringVar(&cfg.fileStoragePath, "f", defaultFileStoragePath, "file storage path")
-	flag.BoolVar(&cfg.restore, "r", defaultRestore, "restore from file on start")
-	flag.StringVar(&cfg.databaseDSN, "d", defaultDatabaseDSN, "database DSN")
+	flag.StringVar(&cfg.FileStoragePath, "f", defaultFileStoragePath, "file storage path")
+	flag.BoolVar(&cfg.Restore, "r", defaultRestore, "restore from file on start")
+	flag.StringVar(&cfg.DatabaseDSN, "d", defaultDatabaseDSN, "database DSN")
+	flag.StringVar(&cfg.HashKey, "k", defaultHashKey, "key for hashing")
 	flag.Parse()
 
 	viper.AutomaticEnv()
-	helper.AssignFromViperIfSet(&cfg.serverAddress, "ADDRESS", viper.GetString, defaultServerAddress)
+	helper.AssignFromViperIfSet(&cfg.ServerAddress, "ADDRESS", viper.GetString, defaultServerAddress)
 	helper.AssignFromViperIfSet(&storeInterval, "STORE_INTERVAL", viper.GetInt, defaultStoreInterval)
-	helper.AssignFromViperIfSet(&cfg.fileStoragePath, "FILE_STORAGE_PATH", viper.GetString, defaultFileStoragePath)
-	helper.AssignFromViperIfSet(&cfg.restore, "RESTORE", viper.GetBool, defaultRestore)
-	helper.AssignFromViperIfSet(&cfg.databaseDSN, "DATABASE_DSN", viper.GetString, defaultDatabaseDSN)
+	helper.AssignFromViperIfSet(&cfg.FileStoragePath, "FILE_STORAGE_PATH", viper.GetString, defaultFileStoragePath)
+	helper.AssignFromViperIfSet(&cfg.Restore, "RESTORE", viper.GetBool, defaultRestore)
+	helper.AssignFromViperIfSet(&cfg.DatabaseDSN, "DATABASE_DSN", viper.GetString, defaultDatabaseDSN)
+	helper.AssignFromViperIfSet(&cfg.HashKey, "KEY", viper.GetString, defaultHashKey)
 
-	cfg.storeInterval = time.Duration(storeInterval) * time.Second
+	cfg.StoreInterval = time.Duration(storeInterval) * time.Second
 
 	return cfg
 }
@@ -68,15 +66,15 @@ func main() {
 	var db *sql.DB
 	var err error
 
-	if cfg.databaseDSN != "" {
+	if cfg.DatabaseDSN != "" {
 		log.Println("Using database storage.")
-		db, err = sql.Open("pgx", cfg.databaseDSN)
+		db, err = sql.Open("pgx", cfg.DatabaseDSN)
 		if err != nil {
 			log.Fatalf("Failed to connect to the database: %v", err)
 		}
 		defer db.Close()
 
-		if err = db.PingContext(ctx); err != nil && cfg.databaseDSN != "" {
+		if err = db.PingContext(ctx); err != nil && cfg.DatabaseDSN != "" {
 			log.Fatalf("cannot connect to db: %v", err)
 		}
 
@@ -86,7 +84,7 @@ func main() {
 		}
 	} else {
 		log.Println("Using in-memory storage.")
-		memStorage, err := store.NewMemStorage(cfg.fileStoragePath, cfg.storeInterval, cfg.restore)
+		memStorage, err := store.NewMemStorage(cfg.FileStoragePath, cfg.StoreInterval, cfg.Restore)
 		if err != nil {
 			log.Fatalf("Failed to create memory storage: %v", err)
 		}
@@ -95,10 +93,10 @@ func main() {
 		defer memStorage.SaveOnExit()
 	}
 
-	server := services.NewMetricServer(cfg.serverAddress, storage)
+	server := services.NewMetricServer(cfg, storage)
 
 	go func() {
-		log.Printf("Starting server on %s", cfg.serverAddress)
+		log.Printf("Starting server on %s", cfg.ServerAddress)
 		if err := server.ListenAndServe(); err != nil && err != context.Canceled {
 			log.Fatalf("server error: %v", err)
 		}

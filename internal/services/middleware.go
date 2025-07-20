@@ -1,12 +1,14 @@
 package services
 
 import (
+	"bytes"
 	"net/http"
 	"time"
 	"github.com/rs/zerolog/log"
 	"compress/gzip"
 	"io"
 	"strings"
+	"ypMetrics/internal/helper"
 )
 
 func LoggingMiddleware(next http.Handler) http.Handler {
@@ -83,4 +85,77 @@ func GzipMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Content-Encoding", "gzip")
 		next.ServeHTTP(gzipResponseWriter{Writer: gz, ResponseWriter: w}, r)
 	})
+}
+
+type hashResponseWriter struct {
+	w          http.ResponseWriter
+	body       *bytes.Buffer
+	statusCode int
+}
+
+func (hrw *hashResponseWriter) Header() http.Header {
+	return hrw.w.Header()
+}
+
+func (hrw *hashResponseWriter) Write(data []byte) (int, error) {
+	if hrw.statusCode == 0 {
+		hrw.statusCode = http.StatusOK
+	}
+	return hrw.body.Write(data)
+}
+
+func (hrw *hashResponseWriter) WriteHeader(statusCode int) {
+	hrw.statusCode = statusCode
+}
+
+func HashMiddleware(key string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if key == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			if r.Body != http.NoBody {
+				clientHash := r.Header.Get("HashSHA256")
+				if clientHash == "" {
+					http.Error(w, "missing hash header", http.StatusBadRequest)
+					return
+				}
+
+				bodyBytes, err := io.ReadAll(r.Body)
+				if err != nil {
+					http.Error(w, "cannot read body", http.StatusInternalServerError)
+					return
+				}
+				r.Body.Close()
+				r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+				serverHash, err := helper.CalculateHash(bodyBytes, key)
+				if err != nil {
+					http.Error(w, "cannot calculate hash", http.StatusInternalServerError)
+					return
+				}
+
+				if clientHash != serverHash {
+					http.Error(w, "invalid hash", http.StatusBadRequest)
+					return
+				}
+			}
+
+			hrw := &hashResponseWriter{w: w, body: bytes.NewBuffer(nil)}
+			next.ServeHTTP(hrw, r)
+
+			if hrw.body.Len() > 0 {
+				if responseHash, err := helper.CalculateHash(hrw.body.Bytes(), key); err == nil && responseHash != "" {
+					w.Header().Set("HashSHA256", responseHash)
+				}
+			}
+
+			if hrw.statusCode != 0 {
+				w.WriteHeader(hrw.statusCode)
+			}
+			w.Write(hrw.body.Bytes())
+		})
+	}
 }

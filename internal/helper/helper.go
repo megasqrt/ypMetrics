@@ -3,6 +3,9 @@ package helper
 import (
 	"fmt"
 	"time"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 
 	"github.com/spf13/viper"
 )
@@ -42,4 +45,16 @@ func Retryer(f func() error, isRetryable func(error) bool) error {
 		}
 	}
 	return err
+}
+
+func CalculateHash(data []byte, key string) (string, error) {
+	if key == "" {
+		return "", nil
+	}
+	h := hmac.New(sha256.New, []byte(key))
+	_, err := h.Write(data)
+	if err != nil {
+		return "", fmt.Errorf("failed to write to hmac: %w", err)
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }

@@ -51,7 +51,7 @@ func TestHTTPReporter_Report(t *testing.T) {
 		}))
 		defer server.Close()
 
-		reporter := NewHTTPReporter(server.Listener.Addr().String())
+		reporter := NewHTTPReporter(server.Listener.Addr().String(), "")
 		err := reporter.Report(metricsToSend)
 		require.NoError(t, err)
 
@@ -86,7 +86,7 @@ func TestHTTPReporter_Report(t *testing.T) {
 		}))
 		defer server.Close()
 
-		reporter := NewHTTPReporter(server.Listener.Addr().String())
+		reporter := NewHTTPReporter(server.Listener.Addr().String(), "")
 		err := reporter.Report(metricsToSend)
 		require.NoError(t, err)
 

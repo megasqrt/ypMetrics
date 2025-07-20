@@ -68,24 +68,28 @@ var (
 	serverAddress  string
 	reportInterval int
 	pollInterval   int
+	hashKey        string
 )
 
 type config struct {
 	serverAddress  string
 	pollInterval   time.Duration
 	reportInterval time.Duration
+	hashKey        string
 }
 
 const (
 	defaultServerAddress  = "localhost:8080"
 	defaultReportInterval = 10
 	defaultPollInterval   = 2
+	defaultHashKey        = ""
 )
 
 func registerFlags() {
 	flag.StringVar(&serverAddress, "a", defaultServerAddress, "server adress")
 	flag.IntVar(&reportInterval, "r", defaultReportInterval, "report interval")
 	flag.IntVar(&pollInterval, "p", defaultPollInterval, "poll interval")
+	flag.StringVar(&hashKey, "k", defaultHashKey, "key for hashing")
 }
 
 func init() {
@@ -100,6 +104,7 @@ func parseConfig() config {
 	helper.AssignFromViperIfSet(&serverAddress, "ADDRESS", viper.GetString, defaultServerAddress)
 	helper.AssignFromViperIfSet(&reportInterval, "REPORT_INTERVAL", viper.GetInt, defaultReportInterval)
 	helper.AssignFromViperIfSet(&pollInterval, "POLL_INTERVAL", viper.GetInt, defaultPollInterval)
+	helper.AssignFromViperIfSet(&hashKey, "KEY", viper.GetString, defaultHashKey)
 	
 	if !govalidator.IsURL(serverAddress) {
 		log.Fatalf("некорректный URL сервера: %s", serverAddress)
@@ -109,6 +114,7 @@ func parseConfig() config {
 		serverAddress:  serverAddress,
 		reportInterval: time.Duration(reportInterval) * time.Second,
 		pollInterval:   time.Duration(pollInterval) * time.Second,
+		hashKey:        hashKey,
 	}
 }
 
@@ -122,7 +128,7 @@ func main() {
 
 	// Создание компонентов
 	collector := agent.NewMetricCollector()
-	reporter := agent.NewHTTPReporter(cfg.serverAddress)
+	reporter := agent.NewHTTPReporter(cfg.serverAddress, cfg.hashKey)
 
 	// Создание и запуск агента
 	agent := NewMetricsAgent(
@@ -138,5 +144,3 @@ func main() {
 	cancel()
 	time.Sleep(time.Second) // Ждем завершения горутин
 }
-
-

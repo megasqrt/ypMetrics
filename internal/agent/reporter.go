@@ -25,14 +25,16 @@ type Reporter interface {
 type HTTPReporter struct {
 	serverAddress string
 	client        *http.Client
+	hashKey       string
 }
 
-func NewHTTPReporter(serverAddress string) *HTTPReporter {
+func NewHTTPReporter(serverAddress string, hashKey string) *HTTPReporter {
 	return &HTTPReporter{
 		serverAddress: serverAddress,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
+		hashKey: hashKey,
 	}
 }
 
@@ -103,6 +105,14 @@ func (r *HTTPReporter) sendGzippedJSON(url string, data interface{}) error {
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
+
+		if r.hashKey != "" {
+			hash, err := helper.CalculateHash(jsonData, r.hashKey)
+			if err != nil {
+				return fmt.Errorf("ошибка вычисления хеша: %w", err)
+			}
+			req.Header.Set("HashSHA256", hash)
+		}
 	
 		resp, err := r.client.Do(req)	
 		
