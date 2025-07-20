@@ -88,9 +88,11 @@ func populateMetrics[T float64 | int64](db *sql.DB, tableName string, dest map[s
 	var err error
 	retryErr := helper.Retryer(func() error {
 		rows, err = db.Query(query)
-		return err },
+		if err!=nil{
+			return err
+		}
+		return nil },
 		dbErrorIsRetryable)
-
 	if retryErr != nil {
 		log.Printf("Error getting %s from DB: %v", tableName, retryErr)
 		return
