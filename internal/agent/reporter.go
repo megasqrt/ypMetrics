@@ -75,12 +75,24 @@ func (r *HTTPReporter) sendSingle(metrics []models.Metrics) error {
 }
 
 func (r *HTTPReporter) pingServer() bool {
-	resp, err := r.client.Get(fmt.Sprintf("http://%s/ping", r.serverAddress))
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-	return resp.StatusCode == http.StatusOK
+	fmt.Println("pingServer")
+	err := helper.Retryer(func() error {
+		resp, err := r.client.Get(fmt.Sprintf("http://%s/ping", r.serverAddress))
+		if err != nil {
+			fmt.Println("pingServer error")
+			return err
+		}
+		fmt.Println("pingServer ok")
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK{
+			return fmt.Errorf("ping failed with status: %s", resp.Status)
+		}
+		fmt.Println("pingServer status ok")
+		return nil
+	}, httpErrorIsRetryable)
+	fmt.Println("pingServer retunr")
+	fmt.Println(err==nil)
+	return err == nil
 }
 
 func (r *HTTPReporter) sendGzippedJSON(url string, data interface{}) error {
