@@ -92,7 +92,7 @@ func populateMetrics[T float64 | int64](db *sql.DB, tableName string, dest map[s
 		dbErrorIsRetryable)
 
 	if retryErr != nil {
-		log.Printf("Error getting %s from DB: %v", tableName, err)
+		log.Printf("Error getting %s from DB: %v", tableName, retryErr)
 		return
 	}
 	defer rows.Close()
