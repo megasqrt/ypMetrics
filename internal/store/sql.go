@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +13,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -20,6 +21,9 @@ import (
 type DBStorage struct {
 	db *sql.DB
 }
+
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 func NewDBStorage(db *sql.DB) (Storage, error) {
 	storage := &DBStorage{db: db}
@@ -30,19 +34,24 @@ func NewDBStorage(db *sql.DB) (Storage, error) {
 }
 
 func (s *DBStorage) initSchema() error {
-	driver, err := postgres.WithInstance(s.db, &postgres.Config{})
+	pgDriver, err := postgres.WithInstance(s.db, &postgres.Config{})
 	if err != nil {
 		return fmt.Errorf("could not create postgres driver: %w", err)
 	}
 
+	sourceInstance, err := iofs.New(migrationsFS, "migrations")
+	if err != nil {
+		return fmt.Errorf("could not create source instance from embedded fs: %w", err)
+	}
 
-	m, err := migrate.NewWithDatabaseInstance("file://internal/store/migrations", "postgres", driver)
+	//m, err := migrate.NewWithSourceInstance("iofs", sourceInstance, "postgres")
+	m, err := migrate.NewWithInstance("iofs", sourceInstance, "postgres",pgDriver)
 	if err != nil {
 		return fmt.Errorf("could not create migrate instance: %w", err)
 	}
 
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		return  fmt.Errorf("could not run up migrations: %w", err)
+		return fmt.Errorf("could not run up migrations: %w", err)
 	}
 
 	return nil
