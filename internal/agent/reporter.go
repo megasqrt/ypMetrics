@@ -3,12 +3,18 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
+	"net"
+	"os"
+	"io"
+	"syscall"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
 
+	"ypMetrics/internal/helper"
 	"ypMetrics/models"
 )
 
@@ -97,10 +103,16 @@ func (r *HTTPReporter) sendGzippedJSON(url string, data interface{}) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
-
-	resp, err := r.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("ошибка отправки запроса: %w", err)
+	
+	var resp *http.Response
+	var	doErr error
+	
+	retryErr := helper.Retryer(func() error {
+		resp, doErr = r.client.Do(req)
+		return doErr},
+		httpErrorIsRetryable)
+	if retryErr != nil {
+		return fmt.Errorf("ошибка отправки запроса: %w", doErr)
 	}
 	defer resp.Body.Close()
 
@@ -108,4 +120,30 @@ func (r *HTTPReporter) sendGzippedJSON(url string, data interface{}) error {
 		return fmt.Errorf("сервер вернул статус не-OK: %s", resp.Status)
 	}
 	return nil
+}
+
+
+func httpErrorIsRetryable(err error) bool {
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		if netErr.Timeout() {
+			return true
+		}
+	}
+
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		var syscallErr *os.SyscallError
+		if errors.As(opErr.Err, &syscallErr) {
+			switch syscallErr.Err {
+			case syscall.ECONNREFUSED, syscall.ECONNRESET:
+				return true
+			}
+		}
+	}
+
+	if errors.Is(err, io.EOF) {
+		return true
+	}
+	return false
 }

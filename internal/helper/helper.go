@@ -1,6 +1,9 @@
 package helper
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/spf13/viper"
 )
 
@@ -14,4 +17,29 @@ func AssignFromViperIfSet[T comparable](dst *T, key string, getter func(string) 
 
 func Ptr[T any](v T) *T {
 	return &v
+}
+
+const (
+	delay      = 5 * time.Second
+	retryCount = 2
+)
+
+func Retryer(f func() error, isRetryable func(error) bool) error {
+	var err error
+	for i := 0; i < retryCount; i++ {
+		err = f()
+		if err == nil {
+			return nil
+		}
+
+		if !isRetryable(err) {
+			return err
+		}
+
+		if i < retryCount {
+			fmt.Printf("Retrying after error: %v. Waiting %s", err, delay)
+			time.Sleep(delay)
+		}
+	}
+	return err
 }

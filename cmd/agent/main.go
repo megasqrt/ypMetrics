@@ -138,3 +138,5 @@ func main() {
 	cancel()
 	time.Sleep(time.Second) // Ждем завершения горутин
 }
+
+
