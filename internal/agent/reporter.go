@@ -96,32 +96,31 @@ func (r *HTTPReporter) sendGzippedJSON(url string, data interface{}) error {
 	if err := gz.Close(); err != nil {
 		return fmt.Errorf("ошибка закрытия gzip writer: %w", err)
 	}
-
-	req, err := http.NewRequest(http.MethodPost, url, &buf)
-	if err != nil {
-		return fmt.Errorf("ошибка создания запроса: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Content-Encoding", "gzip")
+	retryErr := func() error {
+		req, err := http.NewRequest(http.MethodPost, url, &buf)
+		if err != nil {
+			return fmt.Errorf("ошибка создания запроса: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Encoding", "gzip")
 	
-	var resp *http.Response
-	var	doErr error
-	
-	retryErr := helper.Retryer(func() error {
-		resp, doErr = r.client.Do(req)
-		return doErr},
-		httpErrorIsRetryable)
-	if retryErr != nil {
-		return fmt.Errorf("ошибка отправки запроса: %w", doErr)
-	}
-	defer resp.Body.Close()
+		resp, err := r.client.Do(req)	
+		
+		if err != nil {
+			if resp != nil {
+				resp.Body.Close()
+			}
+			return err
+		}
+		defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("сервер вернул статус не-OK: %s", resp.Status)
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("сервер вернул статус не-OK: %s", resp.Status)
+		}
+		return nil
 	}
-	return nil
+	return helper.Retryer(retryErr, httpErrorIsRetryable)
 }
-
 
 func httpErrorIsRetryable(err error) bool {
 	var netErr net.Error
