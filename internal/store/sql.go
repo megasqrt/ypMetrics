@@ -91,26 +91,28 @@ func populateMetrics[T float64 | int64](db *sql.DB, tableName string, dest map[s
 		if err!=nil{
 			return err
 		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var id string
+			var value T
+			if err := rows.Scan(&id, &value); err != nil {
+				log.Printf("Error scanning %s row: %v", tableName, err)
+				continue
+			}
+			dest[id] = value
+		}
+		if err := rows.Err(); err != nil {
+			log.Printf("Error during %s rows iteration: %v", tableName, err)
+		}
+
 		return nil },
 		dbErrorIsRetryable)
 	if retryErr != nil {
 		log.Printf("Error getting %s from DB: %v", tableName, retryErr)
 		return
 	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id string
-		var value T
-		if err := rows.Scan(&id, &value); err != nil {
-			log.Printf("Error scanning %s row: %v", tableName, err)
-			continue
-		}
-		dest[id] = value
-	}
-	if err := rows.Err(); err != nil {
-		log.Printf("Error during %s rows iteration: %v", tableName, err)
-	}
+	
 }
 
 func (s *DBStorage) GetAllMetrics() map[string]interface{} {
