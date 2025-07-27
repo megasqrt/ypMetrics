@@ -121,14 +121,17 @@ func HashMiddleware(key string) func(http.Handler) http.Handler {
 			if r.Body != http.NoBody {
 				clientHash := r.Header.Get("HashSHA256")
 				if clientHash == "" {
-					log.Print("missing hash header")
-					http.Error(w, "missing hash header", http.StatusBadRequest)
+					msg:="missing hash header"
+					log.Print(msg)
+					JSONError(w,http.StatusBadRequest,msg)
 					return
 				}
 
 				bodyBytes, err := io.ReadAll(r.Body)
 				if err != nil {
-					http.Error(w, "cannot read body", http.StatusInternalServerError)
+					msg:="cannot read body"
+					log.Print(msg)
+					JSONError(w,http.StatusBadRequest,msg)
 					return
 				}
 				r.Body.Close()
@@ -136,7 +139,9 @@ func HashMiddleware(key string) func(http.Handler) http.Handler {
 
 				serverHash, err := helper.CalculateHash(bodyBytes, key)
 				if err != nil {
-					http.Error(w, "cannot calculate hash", http.StatusInternalServerError)
+					msg:="cannot calculate hash"
+					log.Print(msg)
+					JSONError(w,http.StatusBadRequest,msg)
 					return
 				}
 
