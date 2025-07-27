@@ -54,9 +54,8 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	metricJSON, err := h.storage.GetJSONMetricsByTypeAndName(m.ID, m.MType)
-
 	if err != nil {
-		JSONError(w,http.StatusNotFound, "json metric not found ")
+		JSONErrorWithMesage(w, http.StatusNotFound, "json metric not found")
 		return
 	}
 
@@ -64,8 +63,14 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 
-func JSONError(w http.ResponseWriter, status int, errorMsg string) {
+func JSONErrorWithBody(w http.ResponseWriter, status int, requestBody []byte) {
     w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(status)
-    json.NewEncoder(w).Encode(map[string]string{"error": errorMsg})
+	w.Write([]byte(requestBody)) 
+}
+
+func JSONErrorWithMesage(w http.ResponseWriter, status int, msg string) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
