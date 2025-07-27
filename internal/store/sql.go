@@ -185,7 +185,7 @@ func (s *DBStorage) GetJSONMetricsByTypeAndName(name, mtype string) ([]byte, err
 			if !errors.Is(err, sql.ErrNoRows) {
 				log.Printf("Error getting gauge %s from DB: %v", name, err)
 			}
-			return nil, fmt.Errorf("metric not found")
+			return nil, fmt.Errorf("metric guage not found in db")
 		}
 		metric.Value = value
 		return json.Marshal(metric)
@@ -195,12 +195,12 @@ func (s *DBStorage) GetJSONMetricsByTypeAndName(name, mtype string) ([]byte, err
 			if !errors.Is(err, sql.ErrNoRows) {
 				log.Printf("Error getting counter %s from DB: %v", name, err)
 			}
-			return nil, fmt.Errorf("metric not found")
+			return nil, fmt.Errorf("metric counter not found in db")
 		}
 		metric.Delta = value
 		return json.Marshal(metric)
 	default:
-		return nil, fmt.Errorf("metric not found")
+		return nil, fmt.Errorf("metric of type %s not found in db",mtype)
 	}
 }
 

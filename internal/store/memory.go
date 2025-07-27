@@ -125,7 +125,7 @@ func (s *MemStorage) GetJSONMetricsByTypeAndName(mName, mType string) ([]byte, e
 			return json.Marshal(metric)
 		}
 	}
-	return nil, fmt.Errorf("metric not found")
+	return nil, fmt.Errorf("metric not found in memory")
 }
 
 func (s *MemStorage) UpdateMetricsBatch(metrics []models.Metrics) error {

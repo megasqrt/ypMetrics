@@ -82,6 +82,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to create DB storage: %v", err)
 		}
+		log.Println("Successfully create database storage.")
 	} else {
 		log.Println("Using in-memory storage.")
 		memStorage, err := store.NewMemStorage(cfg.FileStoragePath, cfg.StoreInterval, cfg.Restore)

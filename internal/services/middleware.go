@@ -2,13 +2,14 @@ package services
 
 import (
 	"bytes"
-	"net/http"
-	"time"
-	"github.com/rs/zerolog/log"
 	"compress/gzip"
 	"io"
+	"net/http"
 	"strings"
+	"time"
 	"ypMetrics/internal/helper"
+
+	"github.com/rs/zerolog/log"
 )
 
 func LoggingMiddleware(next http.Handler) http.Handler {
@@ -111,6 +112,7 @@ func (hrw *hashResponseWriter) WriteHeader(statusCode int) {
 func HashMiddleware(key string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("key is %s", key)
 			if key == "" {
 				next.ServeHTTP(w, r)
 				return
@@ -119,6 +121,7 @@ func HashMiddleware(key string) func(http.Handler) http.Handler {
 			if r.Body != http.NoBody {
 				clientHash := r.Header.Get("HashSHA256")
 				if clientHash == "" {
+					log.Print("missing hash header")
 					http.Error(w, "missing hash header", http.StatusBadRequest)
 					return
 				}
@@ -138,6 +141,7 @@ func HashMiddleware(key string) func(http.Handler) http.Handler {
 				}
 
 				if clientHash != serverHash {
+					log.Print("invalid hash")
 					http.Error(w, "invalid hash", http.StatusBadRequest)
 					return
 				}

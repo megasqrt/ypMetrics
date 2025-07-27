@@ -1,11 +1,11 @@
 package helper
 
 import (
-	"fmt"
-	"time"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -36,6 +36,7 @@ func Retryer(f func() error, isRetryable func(error) bool) error {
 		}
 
 		if !isRetryable(err) {
+			fmt.Printf("Error not retryable: %v. ", err)
 			return err
 		}
 
