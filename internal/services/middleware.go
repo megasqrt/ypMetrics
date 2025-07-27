@@ -15,7 +15,7 @@ import (
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		
+
 		logger := log.With().
 			Str("method", r.Method).
 			Str("uri", r.RequestURI).
@@ -119,29 +119,29 @@ func HashMiddleware(key string) func(http.Handler) http.Handler {
 			}
 
 			if r.Body != http.NoBody {
-				clientHash := r.Header.Get("HashSHA256")
-				if clientHash == "" {
-					msg:="missing hash header"
+				bodyBytes, err := io.ReadAll(r.Body)
+				if err != nil {
+					msg := "cannot read body"
 					log.Print(msg)
-					JSONError(w,http.StatusBadRequest,msg)
+					JSONErrorWithMesage(w, http.StatusBadRequest, msg)
 					return
 				}
 
-				bodyBytes, err := io.ReadAll(r.Body)
-				if err != nil {
-					msg:="cannot read body"
-					log.Print(msg)
-					JSONError(w,http.StatusBadRequest,msg)
-					return
-				}
 				r.Body.Close()
 				r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
+				clientHash := r.Header.Get("HashSHA256")
+				if clientHash == "" {
+					log.Print("missing hash header")
+					JSONErrorWithBody(w, http.StatusBadRequest, bodyBytes)
+					return
+				}
+
 				serverHash, err := helper.CalculateHash(bodyBytes, key)
 				if err != nil {
-					msg:="cannot calculate hash"
+					msg := "cannot calculate hash"
 					log.Print(msg)
-					JSONError(w,http.StatusBadRequest,msg)
+					JSONErrorWithMesage(w, http.StatusBadRequest, msg)
 					return
 				}
 
