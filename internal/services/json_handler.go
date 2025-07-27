@@ -2,8 +2,10 @@ package services
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"ypMetrics/models"
+	"ypMetrics/internal/helper"
 )
 
 func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
@@ -49,28 +51,17 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		log.Printf("Error decoding JSON: %s \n", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	metricJSON, err := h.storage.GetJSONMetricsByTypeAndName(m.ID, m.MType)
 	if err != nil {
-		JSONErrorWithMesage(w, http.StatusNotFound, "json metric not found")
+		log.Printf("json metric error: %s \n", err)
+		helper.JSONErrorWithMesage(w, http.StatusNotFound, "json metric not found")
 		return
 	}
 
 	w.Write(metricJSON)
-}
-
-
-func JSONErrorWithBody(w http.ResponseWriter, status int, requestBody []byte) {
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(status)
-	w.Write([]byte(requestBody)) 
-}
-
-func JSONErrorWithMesage(w http.ResponseWriter, status int, msg string) {
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }

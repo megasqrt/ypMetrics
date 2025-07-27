@@ -6,6 +6,7 @@ import (
 
 	"ypMetrics/internal/store"
 	"ypMetrics/internal/misc"
+	"ypMetrics/internal/services/middlewares"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	zlog "github.com/rs/zerolog/log"
@@ -18,7 +19,8 @@ func NewMetricServer(cfg misc.Config, s store.Storage) *http.Server {
 	handlers := NewHandler(s)
 
 	router := mux.NewRouter()
-	router.Use(LoggingMiddleware, HashMiddleware(cfg.HashKey), GzipMiddleware)
+	HashMiddleware:=middlewares.NewHashMiddleware(cfg.HashKey)
+	router.Use(middlewares.LoggingMiddleware, HashMiddleware.HashMiddleware, middlewares.GzipMiddleware)
 
 
 	router.HandleFunc("/update/", handlers.UpdateMetricJSON).Methods(http.MethodPost)

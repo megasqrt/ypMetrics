@@ -6,7 +6,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"time"
-
+	"encoding/json"
+	"net/http"
 	"github.com/spf13/viper"
 )
 
@@ -58,4 +59,16 @@ func CalculateHash(data []byte, key string) (string, error) {
 		return "", fmt.Errorf("failed to write to hmac: %w", err)
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func JSONErrorWithBody(w http.ResponseWriter, status int, requestBody []byte) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(status)
+	w.Write([]byte(requestBody)) 
+}
+
+func JSONErrorWithMesage(w http.ResponseWriter, status int, msg string) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
