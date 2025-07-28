@@ -9,32 +9,25 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type hashMiddleware struct{
+type hashMiddleware struct {
 	key string
 }
 
 type hashResponseWriter struct {
-	w          http.ResponseWriter
+	http.ResponseWriter
 	body       *bytes.Buffer
 	statusCode int
 }
 
-func (hrw *hashResponseWriter) Header() http.Header {
-	return hrw.w.Header()
-}
-
-func (hrw *hashResponseWriter) Write(data []byte) (int, error) {
-	if hrw.statusCode == 0 {
-		hrw.statusCode = http.StatusOK
-	}
-	return hrw.body.Write(data)
+func (hrw *hashResponseWriter) Write(b []byte) (int, error) {
+	return hrw.body.Write(b)
 }
 
 func (hrw *hashResponseWriter) WriteHeader(statusCode int) {
 	hrw.statusCode = statusCode
 }
 
-func NewHashMiddleware(key string) *hashMiddleware{
+func NewHashMiddleware(key string) *hashMiddleware {
 	return &hashMiddleware{key: key}
 }
 
@@ -50,22 +43,20 @@ func (hm hashMiddleware) HashMiddleware(next http.Handler) http.Handler {
 		if clientHash == "" {
 			log.Print("missing hash header")
 			next.ServeHTTP(w, r)
+			return //для потдержания старых тестов
+		}
+
+		rBody := bytes.NewBuffer(nil)
+		_, err := io.Copy(rBody, r.Body)
+		if err != nil {
+			log.Print("error copy request body")
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		rBody:=bytes.NewBuffer(nil)
-		_,err:=io.Copy(rBody,r.Body)
-		if err !=nil{
-			log.Print("error copy request body")
-			w.WriteHeader(http.StatusBadRequest)
-			return 
-		}
-
-
 		serverHash, err := helper.CalculateHash(rBody.Bytes(), hm.key)
-		log.Print(serverHash) //TODO REMOVE
 		if err != nil {
-			log.Print("cannot calculate hash")
+			log.Print("cannot calculate request hash")
 			helper.JSONErrorWithBody(w, http.StatusBadRequest, rBody.Bytes())
 			return
 		}
@@ -76,24 +67,24 @@ func (hm hashMiddleware) HashMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-			// hrw := &hashResponseWriter{w: w, body: bytes.NewBuffer(nil)}
-			// next.ServeHTTP(hrw, r)
-			// if hrw.statusCode >= 400 {
-			// 	JSONErrorWithBody(w, hrw.statusCode, bodyBytes)
-			// 	return 
-			// }
+		hrw := &hashResponseWriter{
+			ResponseWriter: w,
+			body:           bytes.NewBuffer(nil),
+			statusCode:     http.StatusOK,
+		}
 
+		next.ServeHTTP(hrw, r)
+		responseBody := hrw.body.Bytes()
+		responseHash, err := helper.CalculateHash(responseBody, hm.key)
+		if err != nil {
+			helper.JSONErrorWithBody(w, http.StatusBadRequest, rBody.Bytes())
+			log.Error().Err(err).Msg("Failed to calculate response hash")
+			http.Error(w, "failed to calculate response hash", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("HashSHA256", responseHash)
+		w.WriteHeader(hrw.statusCode)
+		w.Write(responseBody)
 
-			// if hrw.body.Len() > 0 {
-			// 	if responseHash, err := helper.CalculateHash(hrw.body.Bytes(), key); err == nil && responseHash != "" {
-			// 		w.Header().Set("HashSHA256", responseHash)
-			// 	}
-			// }
-
-			// if hrw.statusCode != 0 {
-			// 	w.WriteHeader(hrw.statusCode)
-			// }
-
-			next.ServeHTTP(w,r)
-		})
+	})
 }

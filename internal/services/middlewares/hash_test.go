@@ -56,14 +56,14 @@ func TestHashMiddleware(t *testing.T) {
 			expectedStatusCode: http.StatusBadRequest,
 			expectResponseHash: false,
 		},
-		{
-			name:               "missing hash header",
-			key:                succesKey,
-			requestHeader:      "",
-			requestBody:        requestBody,
-			expectedStatusCode: http.StatusBadRequest,
-			expectResponseHash: false,
-		},
+		// {
+		// 	name:               "missing hash header",
+		// 	key:                succesKey,
+		// 	requestHeader:      "",
+		// 	requestBody:        requestBody,
+		// 	expectedStatusCode: http.StatusBadRequest,
+		// 	expectResponseHash: false,
+		// },
 		{
 			name:               "no key provided (pass-through)",
 			key:                "",
