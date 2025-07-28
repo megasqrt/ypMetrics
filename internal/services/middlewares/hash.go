@@ -67,6 +67,9 @@ func (hm hashMiddleware) HashMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
+		// Восстанавливаем тело запроса, чтобы следующий обработчик мог его прочитать.
+		r.Body = io.NopCloser(rBody)
+
 		hrw := &hashResponseWriter{
 			ResponseWriter: w,
 			body:           bytes.NewBuffer(nil),
