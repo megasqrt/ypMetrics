@@ -91,7 +91,7 @@ func TestHashMiddleware(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			hMd:=NewHashMiddleware(tt.key)
-			middleware := hMd.HashMiddleware(nextHandler)
+			middleware := hMd.HashMiddlewareCheck(nextHandler)
 			middleware.ServeHTTP(rr, req)
 
 			assert.Equal(t, tt.expectedStatusCode, rr.Code)

@@ -20,7 +20,7 @@ func NewMetricServer(cfg misc.Config, s store.Storage) *http.Server {
 
 	router := mux.NewRouter()
 	HashMiddleware:=middlewares.NewHashMiddleware(cfg.HashKey)
-	router.Use(middlewares.LoggingMiddleware, HashMiddleware.HashMiddleware, middlewares.GzipMiddleware)
+	router.Use(middlewares.LoggingMiddleware, HashMiddleware.HashMiddlewareCheck, HashMiddleware.HashMiddlewareResponse, middlewares.GzipMiddleware)
 
 
 	router.HandleFunc("/update/", handlers.UpdateMetricJSON).Methods(http.MethodPost)
