@@ -4,10 +4,12 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
-	"time"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"time"
+
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
@@ -37,12 +39,12 @@ func Retryer(f func() error, isRetryable func(error) bool) error {
 		}
 
 		if !isRetryable(err) {
-			fmt.Printf("Error not retryable: %v. ", err)
+			log.Printf("Error not retryable: %v. ", err)
 			return err
 		}
 
 		if i < retryCount {
-			fmt.Printf("Retrying after error: %v. Waiting %s", err, delay)
+			log.Printf("Retrying after error: %v. Waiting %s", err, delay)
 			time.Sleep(delay)
 		}
 	}
@@ -62,13 +64,13 @@ func CalculateHash(data []byte, key string) (string, error) {
 }
 
 func JSONErrorWithBody(w http.ResponseWriter, status int, requestBody []byte) {
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(status)
-	w.Write([]byte(requestBody)) 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	w.Write([]byte(requestBody))
 }
 
 func JSONErrorWithMesage(w http.ResponseWriter, status int, msg string) {
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(status)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }

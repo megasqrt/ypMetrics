@@ -4,23 +4,25 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"ypMetrics/models"
 	"ypMetrics/internal/helper"
+	"ypMetrics/models"
 )
 
 func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	var m models.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		log.Printf("Error update decoding JSON: %s \n", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if m.ID == "" || (m.MType != "gauge" && m.MType != "counter") {
+		log.Panicf("invalid metric data type %s \n", m.MType)
 		http.Error(w, "invalid metric data", http.StatusBadRequest)
 		return
 	}
-
+	log.Printf("mType %s \n ID %s \n", m.MType, m.ID)
 	switch m.MType {
 	case "gauge":
 		if m.Value == nil {
@@ -38,6 +40,7 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	updatedMetric, err := h.storage.GetJSONMetricsByTypeAndName(m.ID, m.MType)
 	if err != nil {
+		log.Panicf("could not retrieve updated metric: %s \n", err)
 		http.Error(w, "could not retrieve updated metric", http.StatusInternalServerError)
 		return
 	}
