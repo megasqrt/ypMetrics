@@ -45,7 +45,7 @@ func (s *DBStorage) initSchema() error {
 	}
 
 	//m, err := migrate.NewWithSourceInstance("iofs", sourceInstance, "postgres")
-	m, err := migrate.NewWithInstance("iofs", sourceInstance, "postgres",pgDriver)
+	m, err := migrate.NewWithInstance("iofs", sourceInstance, "postgres", pgDriver)
 	if err != nil {
 		return fmt.Errorf("could not create migrate instance: %w", err)
 	}
@@ -65,7 +65,8 @@ func (s *DBStorage) UpdateGauge(name string, value float64) {
     `
 	err := helper.Retryer(func() error {
 		_, err := s.db.Exec(query, name, value)
-		return err },
+		return err
+	},
 		dbErrorIsRetryable)
 	if err != nil {
 		log.Printf("Error updating gauge in DB: %v", err)
@@ -82,7 +83,8 @@ func (s *DBStorage) UpdateCounter(name string, value int64) int64 {
 	var newDelta int64
 	err := helper.Retryer(func() error {
 		err := s.db.QueryRow(query, name, value).Scan(&newDelta)
-		return err },
+		return err
+	},
 		dbErrorIsRetryable)
 	if err != nil {
 		log.Printf("Error updating counter in DB: %v", err)
@@ -97,7 +99,7 @@ func populateMetrics[T float64 | int64](db *sql.DB, tableName string, dest map[s
 	var err error
 	retryErr := helper.Retryer(func() error {
 		rows, err = db.Query(query)
-		if err!=nil{
+		if err != nil {
 			return err
 		}
 		defer rows.Close()
@@ -115,13 +117,14 @@ func populateMetrics[T float64 | int64](db *sql.DB, tableName string, dest map[s
 			log.Printf("Error during %s rows iteration: %v", tableName, err)
 		}
 
-		return nil },
+		return nil
+	},
 		dbErrorIsRetryable)
 	if retryErr != nil {
 		log.Printf("Error getting %s from DB: %v", tableName, retryErr)
 		return
 	}
-	
+
 }
 
 func (s *DBStorage) GetAllMetrics() map[string]interface{} {
@@ -176,6 +179,7 @@ func (s *DBStorage) GetMetricsByTypeAndName(name, mtype string) ([]byte, error) 
 }
 
 func (s *DBStorage) GetJSONMetricsByTypeAndName(name, mtype string) ([]byte, error) {
+	log.Println("GetJSONMetricsByTypeAndName db")
 	metric := models.Metrics{ID: name, MType: mtype}
 
 	switch mtype {
@@ -200,7 +204,7 @@ func (s *DBStorage) GetJSONMetricsByTypeAndName(name, mtype string) ([]byte, err
 		metric.Delta = value
 		return json.Marshal(metric)
 	default:
-		return nil, fmt.Errorf("metric of type %s not found in db",mtype)
+		return nil, fmt.Errorf("metric of type %s not found in db", mtype)
 	}
 }
 
@@ -260,22 +264,22 @@ func (s *DBStorage) Ping(ctx context.Context) error {
 }
 
 func dbErrorIsRetryable(err error) bool {
-		var pgErr *pgconn.PgError
+	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		// Полный список кодов ошибок: https://www.postgresql.org/docs/current/errcodes-appendix.html
 		switch pgErr.Code {
 		// Ошибки, связанные с временной недоступностью или проблемами соединения.
-		case pgerrcode.AdminShutdown,      // 57P01: Сервер закрывает соединение.
-			pgerrcode.CannotConnectNow,     // 57P03: Сервер еще не готов принимать подключения.
-			pgerrcode.ConnectionFailure,    // 08006: Обрыв соединения.
+		case pgerrcode.AdminShutdown, // 57P01: Сервер закрывает соединение.
+			pgerrcode.CannotConnectNow,       // 57P03: Сервер еще не готов принимать подключения.
+			pgerrcode.ConnectionFailure,      // 08006: Обрыв соединения.
 			pgerrcode.ConnectionDoesNotExist, // 08003: Соединение не существует.
-			pgerrcode.TooManyConnections:   // 53300: Слишком много подключений.
+			pgerrcode.TooManyConnections:     // 53300: Слишком много подключений.
 			return true
 
 		// Ошибки, связанные с конфликтами транзакций, которые можно разрешить повторной попыткой.
 		case pgerrcode.SerializationFailure, // 40001: Ошибка сериализации транзакции.
-			pgerrcode.DeadlockDetected,     // 40P01: Обнаружена взаимная блокировка (deadlock).
-			pgerrcode.LockNotAvailable:       // 55P03: Ресурс заблокирован другой транзакцией.
+			pgerrcode.DeadlockDetected, // 40P01: Обнаружена взаимная блокировка (deadlock).
+			pgerrcode.LockNotAvailable: // 55P03: Ресурс заблокирован другой транзакцией.
 			return true
 		}
 	}
