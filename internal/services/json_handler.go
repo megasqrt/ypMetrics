@@ -18,7 +18,7 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if m.ID == "" || (m.MType != "gauge" && m.MType != "counter") {
-		log.Panicf("invalid metric data type %s \n", m.MType)
+		log.Printf("invalid metric data type %s \n", m.MType)
 		http.Error(w, "invalid metric data", http.StatusBadRequest)
 		return
 	}
@@ -40,7 +40,7 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	updatedMetric, err := h.storage.GetJSONMetricsByTypeAndName(m.ID, m.MType)
 	if err != nil {
-		log.Panicf("could not retrieve updated metric: %s \n", err)
+		log.Printf("could not retrieve updated metric: %s \n", err)
 		http.Error(w, "could not retrieve updated metric", http.StatusInternalServerError)
 		return
 	}
