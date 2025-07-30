@@ -92,9 +92,9 @@ type hashResponseWriter struct {
 	key string
 }
 
-func (hw *hashResponseWriter) WriteHeader(statusCode int) {
+func (hrw *hashResponseWriter) WriteHeader(statusCode int) {
 
-	hw.ResponseWriter.WriteHeader(statusCode)
+	hrw.ResponseWriter.WriteHeader(statusCode)
 }
 
 //iter 14 При наличии ключа на этапе формирования ответа
