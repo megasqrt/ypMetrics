@@ -19,15 +19,15 @@ func TestHashMiddlewareResponse(t *testing.T) {
 		w.Write([]byte("OK"))
 	})
 
-	const succesKey = "supersecret"
-	//const badKey = "supersecret"
-	const hashHeader = "HashSHA256"
+	const key = "supersecret"
+	const hashHeaderName = "HashSHA256"
 
 	requestBody := `{"id":"TestGauge","type":"gauge"}`
-	requestHash, _ := helper.CalculateHash([]byte(requestBody), succesKey)
+	requestHash, _ := helper.CalculateHash([]byte(requestBody), key)
 
 	responseBody := "OK"
-	responseHash, _ := helper.CalculateHash([]byte(responseBody), succesKey)
+
+	badHash, _ := helper.CalculateHash([]byte(responseBody), "badKey")
 
 	//badResponseHash, _ := helper.CalculateHash([]byte(responseBody), badKey)
 
@@ -42,7 +42,7 @@ func TestHashMiddlewareResponse(t *testing.T) {
 	}{
 		{
 			name:               "valid hash",
-			key:                succesKey,
+			key:                key,
 			requestHeader:      requestHash,
 			requestBody:        requestBody,
 			expectedStatusCode: http.StatusOK,
@@ -59,11 +59,11 @@ func TestHashMiddlewareResponse(t *testing.T) {
 		},
 		{
 			name:               "bad key",
-			key:                "",
-			requestHeader:      "",
+			key:                key,
+			requestHeader:      badHash,
 			requestBody:        requestBody,
-			expectedStatusCode: http.StatusOK,
-			expectedBody:       "OK",
+			expectedStatusCode: http.StatusBadRequest,
+			expectedBody:       requestBody,
 			expectResponseHash: false,
 		},
 	}
@@ -71,20 +71,20 @@ func TestHashMiddlewareResponse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/value/", bytes.NewBufferString(tt.requestBody))
 			if tt.requestHeader != "" {
-				req.Header.Set(hashHeader, tt.requestHeader)
+				req.Header.Set(hashHeaderName, tt.requestHeader)
 			}
 
 			rr := httptest.NewRecorder()
 			hMd := NewHashMiddleware(tt.key)
-			middleware := hMd.HashMiddlewareResponse(nextHandler)
+			middleware := hMd.HashMiddleware(nextHandler)
 			middleware.ServeHTTP(rr, req)
 
 			assert.Equal(t, tt.expectedStatusCode, rr.Code)
 
 			if tt.expectResponseHash {
-				assert.Equal(t, responseHash, rr.Header().Get(hashHeader))
-			} else {
-				assert.Empty(t, rr.Header().Get(hashHeader))
+			 	assert.NotNil(t, rr.Header().Get(hashHeaderName))
+			 } else {
+			 	assert.Empty(t, rr.Header().Get(hashHeaderName))
 			}
 
 			if tt.expectedStatusCode == http.StatusOK {

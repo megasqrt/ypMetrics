@@ -3,15 +3,16 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
-	"errors"
-	"net"
-	"os"
-	"io"
-	"syscall"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"net/http"
+	"os"
+	"sync"
+	"syscall"
 	"time"
 
 	"ypMetrics/internal/helper"
@@ -26,6 +27,8 @@ type HTTPReporter struct {
 	serverAddress string
 	client        *http.Client
 	hashKey       string
+	mu            sync.Mutex
+	nextBatch     bool
 }
 
 func NewHTTPReporter(serverAddress string, hashKey string) *HTTPReporter {
@@ -42,17 +45,25 @@ func (r *HTTPReporter) Report(metrics []models.Metrics) error {
 	if len(metrics) == 0 {
 		return nil
 	}
-
-	if r.pingServer() {
-		err := r.sendBatch(metrics)
+	err := r.pingServer()
+	if err != nil {
+		return fmt.Errorf("report failed. %v", err)
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.nextBatch {
+		err = r.sendBatch(metrics)
 		if err != nil {
 			return fmt.Errorf("ошибка отправки пакета метрик: %w", err)
 		}
-		return nil
+	} else {
+		err = r.sendSingle(metrics)
+		if err != nil {
+			return fmt.Errorf("ошибка отправки single метрик: %w", err)
+		}
 	}
-
-	log.Println("Server ping failed. Falling back to single metric updates.")
-	return r.sendSingle(metrics)
+	r.nextBatch = !r.nextBatch
+	return nil
 }
 
 func (r *HTTPReporter) sendBatch(metrics []models.Metrics) error {
@@ -64,6 +75,7 @@ func (r *HTTPReporter) sendSingle(metrics []models.Metrics) error {
 	url := fmt.Sprintf("http://%s/update/", r.serverAddress)
 	var firstErr error
 	for _, m := range metrics {
+		log.Println(m)
 		if err := r.sendGzippedJSON(url, m); err != nil {
 			log.Printf("Ошибка отправки метрики %s: %v", m.ID, err)
 			if firstErr == nil {
@@ -74,8 +86,7 @@ func (r *HTTPReporter) sendSingle(metrics []models.Metrics) error {
 	return firstErr
 }
 
-func (r *HTTPReporter) pingServer() bool {
-	fmt.Println("pingServer")
+func (r *HTTPReporter) pingServer() error {
 	err := helper.Retryer(func() error {
 		resp, err := r.client.Get(fmt.Sprintf("http://%s/ping", r.serverAddress))
 		if err != nil {
@@ -84,15 +95,13 @@ func (r *HTTPReporter) pingServer() bool {
 		}
 		fmt.Println("pingServer ok")
 		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK{
+		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("ping failed with status: %s", resp.Status)
 		}
 		fmt.Println("pingServer status ok")
 		return nil
 	}, httpErrorIsRetryable)
-	fmt.Println("pingServer retunr")
-	fmt.Println(err==nil)
-	return err == nil
+	return err
 }
 
 func (r *HTTPReporter) sendGzippedJSON(url string, data interface{}) error {
@@ -110,8 +119,12 @@ func (r *HTTPReporter) sendGzippedJSON(url string, data interface{}) error {
 	if err := gz.Close(); err != nil {
 		return fmt.Errorf("ошибка закрытия gzip writer: %w", err)
 	}
+
+	compressedData := buf.Bytes()
+
 	retryErr := func() error {
-		req, err := http.NewRequest(http.MethodPost, url, &buf)
+		//req, err := http.NewRequest(http.MethodPost, url, &buf)
+		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(compressedData))
 		if err != nil {
 			return fmt.Errorf("ошибка создания запроса: %w", err)
 		}
@@ -119,15 +132,16 @@ func (r *HTTPReporter) sendGzippedJSON(url string, data interface{}) error {
 		req.Header.Set("Content-Encoding", "gzip")
 
 		if r.hashKey != "" {
-			hash, err := helper.CalculateHash(jsonData, r.hashKey)
+			//hash, err := helper.CalculateHash(jsonData, r.hashKey)
+			hash, err := helper.CalculateHash(compressedData, r.hashKey)
 			if err != nil {
 				return fmt.Errorf("ошибка вычисления хеша: %w", err)
 			}
 			req.Header.Set("HashSHA256", hash)
 		}
-	
-		resp, err := r.client.Do(req)	
-		
+
+		resp, err := r.client.Do(req)
+
 		if err != nil {
 			if resp != nil {
 				resp.Body.Close()
