@@ -58,8 +58,7 @@ func CalculateHashString(data []byte, key string) string {
 
 func CalculateHashByte(data []byte, key string) []byte {
 	h := hmac.New(sha256.New, []byte(key))
-	h.Write(data)
-	return h.Sum(nil)
+	return h.Sum(data)
 }
 
 func JSONErrorWithBody(w http.ResponseWriter, status int, requestBody []byte) {

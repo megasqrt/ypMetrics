@@ -25,7 +25,8 @@ func (c *MetricCollector) Poll() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.pollCount++ // Просто увеличиваем внутренний счетчик
+	c.pollCount++
+	c.updateCounter("PollCount", c.pollCount)
 	c.updateGauge("RandomValue", rand.Float64())
 	c.pollRuntimeMetrics()
 }
@@ -33,17 +34,19 @@ func (c *MetricCollector) Poll() {
 func (c *MetricCollector) GetMetrics() []models.Metrics {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	// +1 для PollCount
-	result := make([]models.Metrics, 0, len(c.metrics)+1)
+	result := make([]models.Metrics, 0, len(c.metrics))
 	for _, m := range c.metrics {
 		result = append(result, m)
 	}
-
-	// Добавляем PollCount как дельту и сбрасываем его для следующего интервала
-	result = append(result, models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &c.pollCount})
-	c.pollCount = 0
 	return result
+}
+
+func (c *MetricCollector) updateCounter(id string, value int64) {
+	c.metrics[id] = models.Metrics{
+		ID:    id,
+		MType: models.Counter,
+		Delta: helper.Ptr(value),
+	}
 }
 
 func (c *MetricCollector) updateGauge(id string, value float64) {
