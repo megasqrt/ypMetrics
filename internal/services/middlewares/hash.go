@@ -1,19 +1,26 @@
 package middlewares
 
 import (
-	//"encoding/json"
 	"io"
 	"net/http"
 	"ypMetrics/internal/helper"
-	//"ypMetrics/models"
-	"bytes"
 
+	"bytes"
+	//"crypto/hmac"
+	//"encoding/hex"
 
 	"github.com/rs/zerolog/log"
 )
 
 type hashMiddleware struct {
 	key string
+}
+
+type hashResponseWriter struct {
+	http.ResponseWriter
+	body       *bytes.Buffer
+	key string
+	statusCodeSet bool
 }
 
 func NewHashMiddleware(key string) *hashMiddleware {
@@ -31,12 +38,18 @@ func (hm hashMiddleware) HashMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		
-		clientHash := r.Header.Get("HashSHA256")
-		if  clientHash == ""{
+		clientHashString := r.Header.Get("HashSHA256")
+		if  clientHashString == ""{
 			log.Print("missing hash header")
 			next.ServeHTTP(w, r)
 			return 
 		}
+
+		// clientHashByte, err := hex.DecodeString(clientHashString)
+		// if err != nil {
+		// 	http.Error(w, "Error decode request hash", http.StatusBadRequest)
+		// 	return
+		// }
 
 		if r.Body == nil {
 			next.ServeHTTP(w, r)
@@ -52,67 +65,42 @@ func (hm hashMiddleware) HashMiddleware(next http.Handler) http.Handler {
 		r.Body.Close()
 		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
-		// var v []models.Metrics
-		// err = json.Unmarshal(bodyBytes,&v)
-		// if err != nil {
-		// 	log.Print("cannot unmarshal request body")
-		// 	helper.JSONErrorWithBody(w, http.StatusBadRequest, bodyBytes)
-		// }
-
-		serverHash, err := helper.CalculateHash(bodyBytes, hm.key)
-		if err != nil {
-			log.Print("cannot calculate request hash")
-			helper.JSONErrorWithBody(w, http.StatusBadRequest, bodyBytes)
-			return
-		}
 
 		//iter 14 При несовпадении сервер должен отбрасывать полученные данные
 		//  и возвращать http.StatusBadRequest.
-		if clientHash != serverHash {
-			log.Print("invalid hash")
-			helper.JSONErrorWithBody(w, http.StatusBadRequest, bodyBytes)
-			return
-		}
+		// serverHash:= helper.CalculateHashByte(bodyBytes, hm.key)
+		// if !hmac.Equal(clientHashByte, serverHash) {
+		// 	http.Error(w, "Invalid request hash", http.StatusBadRequest)
+		// 	return
+		// }
 
 		hrw := &hashResponseWriter{
 			ResponseWriter: w,
-			body:           []byte{},
+			body:           &bytes.Buffer{},
 			key:            hm.key,
+			
 		}
 
 		next.ServeHTTP(hrw, r)
+
 
 	})
 }
 
 
-type hashResponseWriter struct {
-	http.ResponseWriter
-	body       []byte
-	key string
-}
-
 func (hrw *hashResponseWriter) WriteHeader(statusCode int) {
-
 	hrw.ResponseWriter.WriteHeader(statusCode)
+	//hw.statusCodeSet = true
 }
 
 //iter 14 При наличии ключа на этапе формирования ответа
 //  сервер должен вычислять хеш и передавать его в HTTP-заголовке ответа
 //  с именем HashSHA256.
 func (hrw *hashResponseWriter) Write(b []byte) (int, error) {
-	
-	if hrw.key == "" {
-		responseBody := hrw.body
-		if len(responseBody) > 0 {
-		responseHash, err := helper.CalculateHash(responseBody, hrw.key)
-			
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to calculate response hash")
-			http.Error(hrw, "failed to calculate response hash", http.StatusInternalServerError)
-		}
+	hrw.body.Write(b)
+	if hrw.key == "" && hrw.body.Len() > 0{
+		responseHash := helper.CalculateHashString(hrw.body.Bytes(), hrw.key)
 		hrw.Header().Set("HashSHA256", responseHash)	
-		}
 	}
 	return hrw.ResponseWriter.Write(b)
 }
