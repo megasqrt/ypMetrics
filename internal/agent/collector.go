@@ -7,6 +7,10 @@ import (
 
 	"ypMetrics/internal/helper"
 	"ypMetrics/models"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
+	"log"
+	"fmt"
 )
 
 type MetricCollector struct {
@@ -88,4 +92,27 @@ func (c *MetricCollector) pollRuntimeMetrics() {
 	c.updateGauge("StackSys", float64(memStats.StackSys))
 	c.updateGauge("Sys", float64(memStats.Sys))
 	c.updateGauge("TotalAlloc", float64(memStats.TotalAlloc))
+}
+
+func (c *MetricCollector) PollGopsutil() {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+
+    vm, err := mem.VirtualMemory()
+    if err != nil {
+        log.Printf("Error getting memory stats: %v", err)
+    } else {
+        c.updateGauge("TotalMemory",float64(vm.Total))
+        c.updateGauge("FreeMemory", float64(vm.Free))
+    }
+
+    cpuPercentages, err := cpu.Percent(0, true) 
+    if err != nil {
+        log.Printf("Error getting cpu stats: %v", err)
+    } else {
+        for i, p := range cpuPercentages {
+            metricName := fmt.Sprintf("CPUutilization%d", i+1)
+            c.updateGauge(metricName, p)
+        }
+    }
 }
