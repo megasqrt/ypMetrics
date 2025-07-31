@@ -50,12 +50,16 @@ func Retryer(f func() error, isRetryable func(error) bool) error {
 	return err
 }
 
-func CalculateHash(data []byte, key string) (string, error) {
-	if key == "" {
-		return "", nil
-	}
+func CalculateHashString(data []byte, key string) string {
+	
+	hash := CalculateHashByte( data,key)
+	return hex.EncodeToString(hash)
+}
+
+func CalculateHashByte(data []byte, key string) []byte {
 	h := hmac.New(sha256.New, []byte(key))
-	return hex.EncodeToString(h.Sum(data)), nil
+	h.Write(data)
+	return h.Sum(nil)
 }
 
 func JSONErrorWithBody(w http.ResponseWriter, status int, requestBody []byte) {

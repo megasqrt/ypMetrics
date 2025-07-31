@@ -120,11 +120,9 @@ func (r *HTTPReporter) sendGzippedJSON(url string, data interface{}) error {
 		return fmt.Errorf("ошибка закрытия gzip writer: %w", err)
 	}
 
-	compressedData := buf.Bytes()
-
 	retryErr := func() error {
 		//req, err := http.NewRequest(http.MethodPost, url, &buf)
-		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(compressedData))
+		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(buf.Bytes()))
 		if err != nil {
 			return fmt.Errorf("ошибка создания запроса: %w", err)
 		}
@@ -132,11 +130,8 @@ func (r *HTTPReporter) sendGzippedJSON(url string, data interface{}) error {
 		req.Header.Set("Content-Encoding", "gzip")
 
 		if r.hashKey != "" {
-			//hash, err := helper.CalculateHash(jsonData, r.hashKey)
-			hash, err := helper.CalculateHash(compressedData, r.hashKey)
-			if err != nil {
-				return fmt.Errorf("ошибка вычисления хеша: %w", err)
-			}
+			hash:= helper.CalculateHashString(jsonData, r.hashKey)
+		
 			req.Header.Set("HashSHA256", hash)
 		}
 
