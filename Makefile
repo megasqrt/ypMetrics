@@ -35,4 +35,8 @@ mem_test:
 	run_s &
 	run_a &
 	sleep 60 
+	go tool pprof -http=":9090" -seconds=30 http://localhost:6060/debug/pprof/heap
+	curl -o memprofile.pprof http://localhost:6060/debug/pprof/heap
 
+pprof_compare:
+	go tool pprof -top -diff_base=profiles/base.pprof profiles/result.pprof 
