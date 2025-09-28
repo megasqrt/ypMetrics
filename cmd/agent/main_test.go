@@ -1,185 +1,155 @@
 package main
 
 import (
-	"compress/gzip"
-	"encoding/json"
+	"context"
 	"flag"
-	"net/http"
-	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"ypMetrics/internal/agent"
 	"ypMetrics/models"
 )
 
+var _ agent.Collector = (*mockCollector)(nil)
+
+type mockCollector struct {
+	pollCalls int
+	mu        sync.Mutex
+}
+
+func (m *mockCollector) Poll() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.pollCalls++
+}
+
+func (m *mockCollector) GetMetrics() []models.Metrics {
+	return []models.Metrics{{ID: "dummy", MType: "gauge"}}
+}
+
+var _ agent.Reporter = (*mockReporter)(nil)
+
+type mockReporter struct {
+	reportCalls int
+	mu          sync.Mutex
+}
+
+func (m *mockReporter) Report(metrics []models.Metrics) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.reportCalls++
+	return nil
+}
+
 func TestNewMetricsAgent(t *testing.T) {
-	agent := NewMetricsAgent("localhost:8080", 2*time.Second, 10*time.Second)
-	if agent.serverAddress != "localhost:8080" {
-		t.Errorf("Expected serverAddress 'localhost:8080', got '%s'", agent.serverAddress)
-	}
-	if agent.pollInterval != 2*time.Second {
-		t.Errorf("Expected pollInterval 2s, got %v", agent.pollInterval)
-	}
-	if agent.reportInterval != 10*time.Second {
-		t.Errorf("Expected reportInterval 10s, got %v", agent.reportInterval)
-	}
-	assert.Empty(t, agent.metrics, "Expected empty metrics slice")
-}
+	var collector agent.Collector = agent.NewMetricCollector()
+	reporter := agent.NewHTTPReporter("localhost:8080")
+	pollInterval := 2 * time.Second
+	reportInterval := 10 * time.Second
 
-func TestIncrementPollCount(t *testing.T) {
-	agent := NewMetricsAgent("localhost:8080", 1*time.Second, 1*time.Second)
+	metricsAgent := NewMetricsAgent(collector, reporter, pollInterval, reportInterval)
 
-	agent.incrementPollCount()
-
-	var pollCountValue int64
-	found := false
-	for _, m := range agent.metrics {
-		if m.ID == "PollCount" {
-			pollCountValue = *m.Delta
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "PollCount metric should be created")
-	assert.Equal(t, int64(1), pollCountValue, "Expected PollCount 1 after first call")
-
-	// Второй вызов должен инкрементировать
-	agent.incrementPollCount()
-	for _, m := range agent.metrics {
-		if m.ID == "PollCount" {
-			pollCountValue = *m.Delta
-			break
-		}
-	}
-	assert.Equal(t, int64(2), pollCountValue, "Expected PollCount 2 after second call")
-}
-
-func TestCollectRuntimeMetrics(t *testing.T) {
-	agent := NewMetricsAgent("localhost:8080", 1*time.Second, 1*time.Second)
-	agent.collectRuntimeMetrics()
-
-	requiredMetrics := []string{
-		"Alloc", "BuckHashSys", "Frees", "GCCPUFraction", "GCSys",
-		"HeapAlloc", "HeapIdle", "HeapInuse", "HeapObjects",
-	}
-
-	collectedMetrics := make(map[string]bool)
-	for _, m := range agent.metrics {
-		collectedMetrics[m.ID] = true
-	}
-
-	for _, metricName := range requiredMetrics {
-		assert.True(t, collectedMetrics[metricName], "Expected metric '%s' not found in collected metrics", metricName)
-	}
-}
-
-func TestSendMetrics(t *testing.T) {
-	var receivedMetrics []models.Metrics
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/update/", r.URL.Path)
-		assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
-
-		gz, err := gzip.NewReader(r.Body)
-		require.NoError(t, err)
-		defer gz.Close()
-
-		var m models.Metrics
-		err = json.NewDecoder(gz).Decode(&m)
-		require.NoError(t, err)
-
-		receivedMetrics = append(receivedMetrics, m)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
-	agent := NewMetricsAgent(server.URL[7:], 1*time.Second, 1*time.Second) // ts.URL[7:] чтобы убрать "http://"
-
-	agent.metrics = []models.Metrics{
-		{ID: "TestGauge", MType: "gauge", Value: ptrFloat64(3.14)},
-		{ID: "TestCounter", MType: "counter", Delta: ptrInt64(42)},
-	}
-
-	agent.sendMetrics()
-
-	assert.Len(t, receivedMetrics, 2)
-	assert.Equal(t, "TestGauge", receivedMetrics[0].ID)
-	assert.Equal(t, "TestCounter", receivedMetrics[1].ID)
+	assert.Equal(t, collector, metricsAgent.collector)
+	assert.Equal(t, reporter, metricsAgent.reporter)
+	assert.Equal(t, pollInterval, metricsAgent.pollInterval)
+	assert.Equal(t, reportInterval, metricsAgent.reportInterval)
 }
 
 func TestAgentRun(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
+	collector := &mockCollector{}
+	reporter := &mockReporter{}
 
-	agent := NewMetricsAgent(server.URL[7:], 50*time.Millisecond, 100*time.Millisecond)
-	agent.Run()
+	// Используем короткие интервалы для теста
+	pollInterval := 20 * time.Millisecond
+	reportInterval := 40 * time.Millisecond
 
-	time.Sleep(120 * time.Millisecond)
+	metricsAgent := NewMetricsAgent(collector, reporter, pollInterval, reportInterval)
 
-	metricExists := func(id string) bool {
-		for _, m := range agent.metrics {
-			if m.ID == id {
-				return true
-			}
-		}
-		return false
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Millisecond)
+	defer cancel()
 
-	assert.True(t, metricExists("PollCount"), "Expected PollCount to be present after agent run")
-	assert.True(t, metricExists("RandomValue"), "Expected RandomValue to be present after agent run")
+	metricsAgent.Run(ctx)
+
+	collector.mu.Lock()
+	assert.GreaterOrEqual(t, collector.pollCalls, 4, "poll should be called multiple times")
+	collector.mu.Unlock()
+
+	reporter.mu.Lock()
+
+	assert.GreaterOrEqual(t, reporter.reportCalls, 2, "report should be called multiple times")
+	reporter.mu.Unlock()
 }
 
-func TestFlagParsing(t *testing.T) {
+func TestParseConfig(t *testing.T) {
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
 
 	tests := []struct {
-		name          string
-		args          []string
-		wantAddress   string
-		wantReportInt int
-		wantPollInt   int
+		name           string
+		args           []string
+		env            map[string]string
+		expectedAddr   string
+		expectedReport time.Duration
+		expectedPoll   time.Duration
 	}{
 		{
-			name:          "default values",
-			args:          []string{"cmd"},
-			wantAddress:   "localhost:8080",
-			wantReportInt: 10,
-			wantPollInt:   2,
+			name:           "default values",
+			args:           []string{"cmd"},
+			env:            nil,
+			expectedAddr:   "localhost:8080",
+			expectedReport: 10 * time.Second,
+			expectedPoll:   2 * time.Second,
 		},
 		{
-			name:          "custom values",
-			args:          []string{"cmd", "-a=127.0.0.1:9090", "-r=5", "-p=1"},
-			wantAddress:   "127.0.0.1:9090",
-			wantReportInt: 5,
-			wantPollInt:   1,
+			name:           "custom flag values",
+			args:           []string{"cmd", "-a=127.0.0.1:9090", "-r=5", "-p=1"},
+			env:            nil,
+			expectedAddr:   "127.0.0.1:9090",
+			expectedReport: 5 * time.Second,
+			expectedPoll:   1 * time.Second,
+		},
+		{
+			name: "env values",
+			args: []string{"cmd"},
+			env: map[string]string{
+				"ADDRESS":         "env.host:1234",
+				"REPORT_INTERVAL": "15",
+				"POLL_INTERVAL":   "3",
+			},
+			expectedAddr:   "env.host:1234",
+			expectedReport: 15 * time.Second,
+			expectedPoll:   3 * time.Second,
+		},
+		{
+			name: "flags override env values",
+			args: []string{"cmd", "-a=flag.host:5678"},
+			env: map[string]string{
+				"ADDRESS": "env.host:1234",
+			},
+			expectedAddr:   "flag.host:5678",
+			expectedReport: 10 * time.Second,
+			expectedPoll:   2 * time.Second,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fs := flag.NewFlagSet(tt.name, flag.ContinueOnError)
+			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+			registerFlags()
 
-			var (
-				addr      string
-				reportInt int
-				pollInt   int
-			)
+			os.Args = tt.args
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
 
-			fs.StringVar(&addr, "a", "localhost:8080", "server address")
-			fs.IntVar(&reportInt, "r", 10, "report interval")
-			fs.IntVar(&pollInt, "p", 2, "poll interval")
+			cfg := parseConfig()
 
-			err := fs.Parse(tt.args[1:])
-			assert.NoError(t, err)
-
-			assert.Equal(t, tt.wantAddress, addr)
-			assert.Equal(t, tt.wantReportInt, reportInt)
-			assert.Equal(t, tt.wantPollInt, pollInt)
+			assert.Equal(t, tt.expectedAddr, cfg.serverAddress)
+			assert.Equal(t, tt.expectedReport, cfg.reportInterval)
+			assert.Equal(t, tt.expectedPoll, cfg.pollInterval)
 		})
 	}
 }

@@ -26,24 +26,34 @@ type config struct {
 	databaseDSN     string	
 }
 
+const (
+	defaultServerAddress   = "localhost:8080"
+	defaultStoreInterval   = 300
+	defaultFileStoragePath = "/tmp/metrics-db.json"
+	defaultRestore         = true
+	defaultDatabaseDSN     = ""
+)
+
 func parseConfig() config {
 	var cfg config
 	var storeInterval int
 
-	flag.StringVar(&cfg.serverAddress, "a", "localhost:8080", "server address")
-	flag.IntVar(&storeInterval, "i", 300, "store interval in seconds")
-	flag.StringVar(&cfg.fileStoragePath, "f", "/tmp/metrics-db.json", "file storage path")
-	flag.BoolVar(&cfg.restore, "r", true, "restore from file on start")
-	flag.StringVar(&cfg.databaseDSN, "d", "", "database DSN")
+	flag.StringVar(&cfg.serverAddress, "a", defaultServerAddress, "server address")
+	flag.IntVar(&storeInterval, "i", int(defaultStoreInterval), "store interval in seconds")
+	flag.StringVar(&cfg.fileStoragePath, "f", defaultFileStoragePath, "file storage path")
+	flag.BoolVar(&cfg.restore, "r", defaultRestore, "restore from file on start")
+	flag.StringVar(&cfg.databaseDSN, "d", defaultDatabaseDSN, "database DSN")
 	flag.Parse()
 
 	viper.AutomaticEnv()
-	helper.AssignFromViperIfSet(&cfg.serverAddress, "ADDRESS", viper.GetString)
-	helper.AssignFromViperIfSet(&storeInterval, "STORE_INTERVAL", viper.GetInt)
-	helper.AssignFromViperIfSet(&cfg.fileStoragePath, "FILE_STORAGE_PATH", viper.GetString)
-	helper.AssignFromViperIfSet(&cfg.restore, "RESTORE", viper.GetBool)
-	helper.AssignFromViperIfSet(&cfg.databaseDSN, "DATABASE_DSN", viper.GetString)
-	
+	helper.AssignFromViperIfSet(&cfg.serverAddress, "ADDRESS", viper.GetString, defaultServerAddress)
+	helper.AssignFromViperIfSet(&storeInterval, "STORE_INTERVAL", viper.GetInt, defaultStoreInterval)
+	helper.AssignFromViperIfSet(&cfg.fileStoragePath, "FILE_STORAGE_PATH", viper.GetString, defaultFileStoragePath)
+	helper.AssignFromViperIfSet(&cfg.restore, "RESTORE", viper.GetBool, defaultRestore)
+	helper.AssignFromViperIfSet(&cfg.databaseDSN, "DATABASE_DSN", viper.GetString, defaultDatabaseDSN)
+
+	cfg.storeInterval = time.Duration(storeInterval) * time.Second
+
 	return cfg
 }
 

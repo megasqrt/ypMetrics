@@ -4,15 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"ypMetrics/internal/helper"
 	"ypMetrics/models"
-	"errors"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type DBStorage struct {
@@ -52,7 +54,10 @@ func (s *DBStorage) UpdateGauge(name string, value float64) {
     VALUES ($1, $2)
     ON CONFLICT (id) DO UPDATE SET value = $2;
     `
-	_, err := s.db.Exec(query, name, value)
+	err := helper.Retryer(func() error {
+		_, err := s.db.Exec(query, name, value)
+		return err },
+		dbErrorIsRetryable)
 	if err != nil {
 		log.Printf("Error updating gauge in DB: %v", err)
 	}
@@ -66,7 +71,10 @@ func (s *DBStorage) UpdateCounter(name string, value int64) int64 {
     RETURNING value;
     `
 	var newDelta int64
-	err := s.db.QueryRow(query, name, value).Scan(&newDelta)
+	err := helper.Retryer(func() error {
+		err := s.db.QueryRow(query, name, value).Scan(&newDelta)
+		return err },
+		dbErrorIsRetryable)
 	if err != nil {
 		log.Printf("Error updating counter in DB: %v", err)
 		return value
@@ -74,49 +82,45 @@ func (s *DBStorage) UpdateCounter(name string, value int64) int64 {
 	return newDelta
 }
 
+func populateMetrics[T float64 | int64](db *sql.DB, tableName string, dest map[string]T) {
+	query := fmt.Sprintf("SELECT id, value FROM %s", tableName)
+	var rows *sql.Rows
+	var err error
+	retryErr := helper.Retryer(func() error {
+		rows, err = db.Query(query)
+		if err!=nil{
+			return err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var id string
+			var value T
+			if err := rows.Scan(&id, &value); err != nil {
+				log.Printf("Error scanning %s row: %v", tableName, err)
+				continue
+			}
+			dest[id] = value
+		}
+		if err := rows.Err(); err != nil {
+			log.Printf("Error during %s rows iteration: %v", tableName, err)
+		}
+
+		return nil },
+		dbErrorIsRetryable)
+	if retryErr != nil {
+		log.Printf("Error getting %s from DB: %v", tableName, retryErr)
+		return
+	}
+	
+}
+
 func (s *DBStorage) GetAllMetrics() map[string]interface{} {
 	gauges := make(map[string]float64)
 	counters := make(map[string]int64)
 
-	// Запрос для gauges
-	gaugeRows, err := s.db.Query("SELECT id, value FROM gauges")
-	if err != nil {
-		log.Printf("Error getting gauges from DB: %v", err)
-	} else {
-		defer gaugeRows.Close()
-		for gaugeRows.Next() {
-			var id string
-			var value float64
-			if err := gaugeRows.Scan(&id, &value); err != nil {
-				log.Printf("Error scanning gauge row: %v", err)
-				continue
-			}
-			gauges[id] = value
-		}
-		if err := gaugeRows.Err(); err != nil {
-			log.Printf("Error during gauge rows iteration: %v", err)
-		}
-	}
-
-	// Запрос для counters
-	counterRows, err := s.db.Query("SELECT id, value FROM counters")
-	if err != nil {
-		log.Printf("Error getting counters from DB: %v", err)
-	} else {
-		defer counterRows.Close()
-		for counterRows.Next() {
-			var id string
-			var value int64
-			if err := counterRows.Scan(&id, &value); err != nil {
-				log.Printf("Error scanning counter row: %v", err)
-				continue
-			}
-			counters[id] = value
-		}
-		if err := counterRows.Err(); err != nil {
-			log.Printf("Error during counter rows iteration: %v", err)
-		}
-	}
+	populateMetrics(s.db, "gauges", gauges)
+	populateMetrics(s.db, "counters", counters)
 
 	return map[string]interface{}{
 		"gauges":   gauges,
@@ -124,105 +128,148 @@ func (s *DBStorage) GetAllMetrics() map[string]interface{} {
 	}
 }
 
+func getMetricFromDB[T float64 | int64](db *sql.DB, tableName, name string) (*T, error) {
+	var value T
+	query := fmt.Sprintf("SELECT value FROM %s WHERE id = $1", tableName)
+	err := helper.Retryer(func() error {
+		return db.QueryRow(query, name).Scan(&value)
+	}, dbErrorIsRetryable)
+
+	if err != nil {
+		return nil, err
+	}
+	return &value, nil
+}
+
 func (s *DBStorage) GetMetricsByTypeAndName(name, mtype string) ([]byte, error) {
 	switch mtype {
 	case models.Gauge:
-		var value sql.NullFloat64
-		err := s.db.QueryRow("SELECT value FROM gauges WHERE id = $1", name).Scan(&value)
+		value, err := getMetricFromDB[float64](s.db, "gauges", name)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				return nil, fmt.Errorf("metric '%s' of type 'gauge' not found", name)
 			}
 			return nil, err
 		}
-		if value.Valid {
-			return []byte(fmt.Sprintf("%g", value.Float64)), nil
-		}
+		return []byte(fmt.Sprintf("%g", *value)), nil
 	case models.Counter:
-		var delta sql.NullInt64
-		err := s.db.QueryRow("SELECT value FROM counters WHERE id = $1", name).Scan(&delta)
+		value, err := getMetricFromDB[int64](s.db, "counters", name)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				return nil, fmt.Errorf("metric '%s' of type 'counter' not found", name)
 			}
 			return nil, err
 		}
-		if delta.Valid {
-			return []byte(fmt.Sprintf("%d", delta.Int64)), nil
-		}
+		return []byte(fmt.Sprintf("%d", *value)), nil
 	default:
 		return nil, fmt.Errorf("invalid metric type")
 	}
-	return nil, fmt.Errorf("metric '%s' of type '%s' not found", name, mtype)
 }
 
 func (s *DBStorage) GetJSONMetricsByTypeAndName(name, mtype string) ([]byte, error) {
-	var metric models.Metrics
-	metric.ID = name
-	metric.MType = mtype
+	metric := models.Metrics{ID: name, MType: mtype}
 
 	switch mtype {
 	case models.Gauge:
-		var value float64
-		if err := s.db.QueryRow("SELECT value FROM gauges WHERE id = $1", name).Scan(&value); err == nil {
-			metric.Value = &value
-			return json.Marshal(metric)
+		value, err := getMetricFromDB[float64](s.db, "gauges", name)
+		if err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				log.Printf("Error getting gauge %s from DB: %v", name, err)
+			}
+			return nil, fmt.Errorf("metric not found")
 		}
+		metric.Value = value
+		return json.Marshal(metric)
 	case models.Counter:
-		var delta int64
-		if err := s.db.QueryRow("SELECT value FROM counters WHERE id = $1", name).Scan(&delta); err == nil {
-			metric.Delta = &delta
-			return json.Marshal(metric)
+		value, err := getMetricFromDB[int64](s.db, "counters", name)
+		if err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				log.Printf("Error getting counter %s from DB: %v", name, err)
+			}
+			return nil, fmt.Errorf("metric not found")
 		}
+		metric.Delta = value
+		return json.Marshal(metric)
+	default:
+		return nil, fmt.Errorf("metric not found")
 	}
-	return nil, fmt.Errorf("metric not found")
 }
 
 func (s *DBStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
+	retryableFunc := func() error {
+		tx, err := s.db.Begin()
+		if err != nil {
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+		defer tx.Rollback()
 
-	gaugeStmt, err := tx.PrepareContext(context.Background(), `
-        INSERT INTO gauges (id, value) VALUES ($1, $2)
-        ON CONFLICT (id) DO UPDATE SET value = EXCLUDED.value;
-    `)
-	if err != nil {
-		return fmt.Errorf("failed to prepare gauge statement: %w", err)
-	}
-	defer gaugeStmt.Close()
+		gaugeStmt, err := tx.PrepareContext(context.Background(), `
+			INSERT INTO gauges (id, value) VALUES ($1, $2)
+			ON CONFLICT (id) DO UPDATE SET value = EXCLUDED.value;
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to prepare gauge statement: %w", err)
+		}
+		defer gaugeStmt.Close()
 
-	counterStmt, err := tx.PrepareContext(context.Background(), `
-        INSERT INTO counters (id, value) VALUES ($1, $2)
-        ON CONFLICT (id) DO UPDATE SET value = counters.value + EXCLUDED.value;
-    `)
-	if err != nil {
-		return fmt.Errorf("failed to prepare counter statement: %w", err)
-	}
-	defer counterStmt.Close()
+		counterStmt, err := tx.PrepareContext(context.Background(), `
+			INSERT INTO counters (id, value) VALUES ($1, $2)
+			ON CONFLICT (id) DO UPDATE SET value = counters.value + EXCLUDED.value;
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to prepare counter statement: %w", err)
+		}
+		defer counterStmt.Close()
 
-	for _, m := range metrics {
-		switch m.MType {
-		case models.Gauge:
-			if m.Value != nil {
-				if _, err := gaugeStmt.ExecContext(context.Background(), m.ID, *m.Value); err != nil {
-					return fmt.Errorf("failed to execute gauge statement for %s: %w", m.ID, err)
+		for _, m := range metrics {
+			switch m.MType {
+			case models.Gauge:
+				if m.Value != nil {
+					if _, err := gaugeStmt.ExecContext(context.Background(), m.ID, *m.Value); err != nil {
+						return fmt.Errorf("failed to execute gauge statement for %s: %w", m.ID, err)
+					}
 				}
-			}
-		case models.Counter:
-			if m.Delta != nil {
-				if _, err := counterStmt.ExecContext(context.Background(), m.ID, *m.Delta); err != nil {
-					return fmt.Errorf("failed to execute counter statement for %s: %w", m.ID, err)
+			case models.Counter:
+				if m.Delta != nil {
+					if _, err := counterStmt.ExecContext(context.Background(), m.ID, *m.Delta); err != nil {
+						return fmt.Errorf("failed to execute counter statement for %s: %w", m.ID, err)
+					}
 				}
 			}
 		}
-	}
 
-	return tx.Commit()
+		return tx.Commit()
+	}
+	return helper.Retryer(retryableFunc, dbErrorIsRetryable)
+
 }
 
 func (s *DBStorage) Ping(ctx context.Context) error {
-	return s.db.PingContext(ctx)
+	return helper.Retryer(func() error {
+		return s.db.PingContext(ctx)
+	}, dbErrorIsRetryable)
+}
+
+func dbErrorIsRetryable(err error) bool {
+		var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		// Полный список кодов ошибок: https://www.postgresql.org/docs/current/errcodes-appendix.html
+		switch pgErr.Code {
+		// Ошибки, связанные с временной недоступностью или проблемами соединения.
+		case pgerrcode.AdminShutdown,      // 57P01: Сервер закрывает соединение.
+			pgerrcode.CannotConnectNow,     // 57P03: Сервер еще не готов принимать подключения.
+			pgerrcode.ConnectionFailure,    // 08006: Обрыв соединения.
+			pgerrcode.ConnectionDoesNotExist, // 08003: Соединение не существует.
+			pgerrcode.TooManyConnections:   // 53300: Слишком много подключений.
+			return true
+
+		// Ошибки, связанные с конфликтами транзакций, которые можно разрешить повторной попыткой.
+		case pgerrcode.SerializationFailure, // 40001: Ошибка сериализации транзакции.
+			pgerrcode.DeadlockDetected,     // 40P01: Обнаружена взаимная блокировка (deadlock).
+			pgerrcode.LockNotAvailable:       // 55P03: Ресурс заблокирован другой транзакцией.
+			return true
+		}
+	}
+
+	return false
 }
