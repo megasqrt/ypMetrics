@@ -1,7 +1,6 @@
 package services
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,13 +14,11 @@ import (
 
 type Handler struct {
 	storage store.Storage
-	db 		*sql.DB
 }
 
-func NewHandler(s store.Storage,db *sql.DB) Handler {
+func NewHandler(s store.Storage) Handler {
 	return Handler{
 		storage: s,
-		db: db,
 	}
 }
 
@@ -129,7 +126,6 @@ func (h *Handler) metricsHTMLHandler(w http.ResponseWriter, r *http.Request) {
     }
 }
 
-
 func (h *Handler) getMetricHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
@@ -153,13 +149,26 @@ func (h *Handler) getMetricHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) dbPingHandler(w http.ResponseWriter, r *http.Request) {
-	if h.db == nil {
-		http.Error(w, "database connection is not set up", http.StatusInternalServerError)
+
+	if err := h.storage.Ping(r.Context()); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Storage ping failed: %s", err)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func (h *Handler) UpdateMetricsBatchJSON(w http.ResponseWriter, r *http.Request) {
+	var metrics []models.Metrics
+	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
-	if err := h.db.PingContext(r.Context()); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "ERROR Handler: %s", err)
+
+	if err := h.storage.UpdateMetricsBatch(metrics); err != nil {
+		http.Error(w, "Failed to update metrics batch", http.StatusInternalServerError)
+		return
 	}
-		w.WriteHeader(http.StatusOK)
+
+	w.WriteHeader(http.StatusOK)
 }

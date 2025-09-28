@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"ypMetrics/internal/helper"
-	"ypMetrics/internal/metrics"
 	"ypMetrics/internal/services"
 	"ypMetrics/internal/store"
 
@@ -55,31 +54,38 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	db, err := sql.Open("pgx", cfg.databaseDSN)
-	if err != nil {
-		log.Fatalf("Failed to connect to the database: %v", err)
-	}
+	var storage store.Storage
+	var db *sql.DB
+	var err error
 
-	if err := db.PingContext(ctx); err != nil && cfg.databaseDSN!="" {
-		log.Fatalf("cannot connect to db: %v", err)
-	}
-	defer db.Close()
-		
-	var fileStorage metrics.FileStorer
-	if cfg.fileStoragePath != "" {
-		fileStorage = store.NewFileStorage(cfg.fileStoragePath)
-	}
-	memStorage := metrics.NewMemStorage(fileStorage, cfg.storeInterval)
-
-	if fileStorage != nil && cfg.restore {
-		if err := memStorage.LoadFromFile(); err != nil {
-			log.Printf("Warning: could not load metrics from file: %v", err)
+	if cfg.databaseDSN != "" {
+		log.Println("Using database storage.")
+		db, err = sql.Open("pgx", cfg.databaseDSN)
+		if err != nil {
+			log.Fatalf("Failed to connect to the database: %v", err)
 		}
+		defer db.Close()
+
+		if err = db.PingContext(ctx); err != nil && cfg.databaseDSN != "" {
+			log.Fatalf("cannot connect to db: %v", err)
+		}
+
+		storage, err = store.NewDBStorage(db)
+		if err != nil {
+			log.Fatalf("Failed to create DB storage: %v", err)
+		}
+	} else {
+		log.Println("Using in-memory storage.")
+		memStorage, err := store.NewMemStorage(cfg.fileStoragePath, cfg.storeInterval, cfg.restore)
+		if err != nil {
+			log.Fatalf("Failed to create memory storage: %v", err)
+		}
+		storage = memStorage
+		memStorage.StartPeriodicSave(ctx)
+		defer memStorage.SaveOnExit()
 	}
 
-	memStorage.StartPeriodicSave(ctx)
-
-	server := services.NewMetricServer(cfg.serverAddress, memStorage, db)
+	server := services.NewMetricServer(cfg.serverAddress, storage)
 
 	go func() {
 		log.Printf("Starting server on %s", cfg.serverAddress)
@@ -92,17 +98,4 @@ func main() {
 	log.Println("Shutting down server...")
 	server.Shutdown(context.Background())
 
-	log.Println("Closing database connection...")
-	if err := db.Close(); err != nil {
-		log.Printf("Error closing database connection: %v", err)
-	}
-	log.Println("Database connection closed.")
-
-	if fileStorage != nil {
-		if err := memStorage.SaveToFile(); err != nil {
-			log.Printf("Error saving metrics on shutdown: %v", err)
-		} else {
-			log.Println("Metrics saved successfully on shutdown.")
-		}
-	}
 }

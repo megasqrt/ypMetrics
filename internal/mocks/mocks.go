@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"context"
 
 	"ypMetrics/internal/store"
 	"ypMetrics/models"
@@ -127,4 +128,24 @@ func (m *MockStorage) WithCounter(name string, value int64) *MockStorage {
 	}
 	m.Counters[name] = value
 	return m
+}
+
+func (m *MockStorage) Ping(ctx context.Context) error {
+	return nil
+}
+
+func (m *MockStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
+	for _, metric := range metrics {
+		switch metric.MType {
+		case models.Gauge:
+			if metric.Value != nil {
+				m.UpdateGauge(metric.ID, *metric.Value)
+			}
+		case models.Counter:
+			if metric.Delta != nil {
+				m.UpdateCounter(metric.ID, *metric.Delta)
+			}
+		}
+	}
+	return nil
 }
