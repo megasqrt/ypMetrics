@@ -51,8 +51,8 @@ func Retryer(f func() error, isRetryable func(error) bool) error {
 }
 
 func CalculateHashString(data []byte, key string) string {
-	
-	hash := CalculateHashByte( data,key)
+
+	hash := CalculateHashByte(data, key)
 	return hex.EncodeToString(hash)
 }
 
@@ -74,4 +74,4 @@ func JSONErrorWithMesage(w http.ResponseWriter, status int, msg string) {
 }
 
 func Float64Ptr(v float64) *float64 { return &v }
-func Int64Ptr(v int64) *int64    { return &v }
+func Int64Ptr(v int64) *int64       { return &v }

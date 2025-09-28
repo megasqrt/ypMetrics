@@ -14,15 +14,15 @@ func TestParseConfig(t *testing.T) {
 	defer func() { os.Args = originalArgs }()
 
 	testCases := []struct {
-		name              string
-		args              []string
-		env               map[string]string
-		expectedAddress   string
-		expectedInterval  time.Duration
-		expectedPath      string
-		expectedRestore   bool
-		expectedDB        string
-		expectedKey       string
+		name             string
+		args             []string
+		env              map[string]string
+		expectedAddress  string
+		expectedInterval time.Duration
+		expectedPath     string
+		expectedRestore  bool
+		expectedDB       string
+		expectedKey      string
 	}{
 		{
 			name:             "default values",
@@ -69,7 +69,7 @@ func TestParseConfig(t *testing.T) {
 			args:             []string{"cmd", "-a", "localhost:9999", "-k", "flag-key"},
 			env: map[string]string{
 				"ADDRESS": "localhost:7777", // This will be ignored
-				"KEY":     "env-key",      // This will be ignored
+				"KEY":     "env-key",        // This will be ignored
 			},
 			expectedAddress:  "localhost:9999", // Flag value should win
 			expectedInterval: defaultStoreInterval * time.Second,

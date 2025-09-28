@@ -197,7 +197,7 @@ func (s *MemStorage) saveToFileUnlocked() error {
 	}
 
 	allMetrics := map[string]interface{}{
-		"gauges":    s.gauges,
+		"gauges":   s.gauges,
 		"counters": s.counters,
 	}
 

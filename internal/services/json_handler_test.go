@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"ypMetrics/models"
-	"ypMetrics/internal/mocks"
 	"ypMetrics/internal/helper"
+	"ypMetrics/internal/mocks"
+	"ypMetrics/models"
 )
 
 func TestUpdateMetricJSON(t *testing.T) {
@@ -129,14 +129,14 @@ func TestUpdateMetricJSON_InvalidData(t *testing.T) {
 			expected: http.StatusBadRequest,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			body, _ := json.Marshal(tt.request)
 			req, err := http.NewRequest(http.MethodPost, "/update/", bytes.NewBuffer(body))
 			require.NoError(t, err)
 			resp := httptest.NewRecorder()
-			
+
 			handler := NewHandler(&mocks.MockStorage{})
 			handler.UpdateMetricJSON(resp, req)
 

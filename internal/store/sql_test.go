@@ -41,9 +41,8 @@ func TestDBStorage_UpdateCounter(t *testing.T) {
 	metricValue := int64(10)
 	expectedValue := int64(20)
 
-
-rows := sqlmock.NewRows([]string{"value"}).AddRow(expectedValue)
-mock.ExpectQuery("INSERT INTO counters").WithArgs(metricName, metricValue).WillReturnRows(rows)
+	rows := sqlmock.NewRows([]string{"value"}).AddRow(expectedValue)
+	mock.ExpectQuery("INSERT INTO counters").WithArgs(metricName, metricValue).WillReturnRows(rows)
 
 	newValue := storage.UpdateCounter(metricName, metricValue)
 
@@ -66,7 +65,7 @@ func TestDBStorage_GetAllMetrics(t *testing.T) {
 		AddRow("c2", int64(2))
 
 	mock.ExpectQuery("SELECT id, value FROM gauges").WillReturnRows(gaugeRows)
-mock.ExpectQuery("SELECT id, value FROM counters").WillReturnRows(counterRows)
+	mock.ExpectQuery("SELECT id, value FROM counters").WillReturnRows(counterRows)
 
 	allMetrics := storage.GetAllMetrics()
 
@@ -86,8 +85,8 @@ func TestDBStorage_GetMetricsByTypeAndName(t *testing.T) {
 	storage := &DBStorage{db: db}
 
 	t.Run("found gauge", func(t *testing.T) {
-	
-rows := sqlmock.NewRows([]string{"value"}).AddRow(123.45)
+
+		rows := sqlmock.NewRows([]string{"value"}).AddRow(123.45)
 		mock.ExpectQuery("SELECT value FROM gauges").WithArgs("test_gauge").WillReturnRows(rows)
 
 		val, err := storage.GetMetricsByTypeAndName("test_gauge", models.Gauge)
@@ -96,8 +95,8 @@ rows := sqlmock.NewRows([]string{"value"}).AddRow(123.45)
 	})
 
 	t.Run("found counter", func(t *testing.T) {
-	
-rows := sqlmock.NewRows([]string{"value"}).AddRow(int64(10))
+
+		rows := sqlmock.NewRows([]string{"value"}).AddRow(int64(10))
 		mock.ExpectQuery("SELECT value FROM counters").WithArgs("test_counter").WillReturnRows(rows)
 
 		val, err := storage.GetMetricsByTypeAndName("test_counter", models.Counter)
@@ -126,12 +125,12 @@ func TestDBStorage_UpdateMetricsBatch(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
-mock.ExpectPrepare("INSERT INTO gauges")
-mock.ExpectPrepare("INSERT INTO counters")
-mock.ExpectExec("INSERT INTO gauges").WithArgs("g1", 1.1).WillReturnResult(sqlmock.NewResult(1, 1))
-mock.ExpectExec("INSERT INTO counters").WithArgs("c1", int64(1)).WillReturnResult(sqlmock.NewResult(1, 1))
-mock.ExpectExec("INSERT INTO gauges").WithArgs("g2", 2.2).WillReturnResult(sqlmock.NewResult(1, 1))
-mock.ExpectCommit()
+	mock.ExpectPrepare("INSERT INTO gauges")
+	mock.ExpectPrepare("INSERT INTO counters")
+	mock.ExpectExec("INSERT INTO gauges").WithArgs("g1", 1.1).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec("INSERT INTO counters").WithArgs("c1", int64(1)).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec("INSERT INTO gauges").WithArgs("g2", 2.2).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
 
 	err = storage.UpdateMetricsBatch(metrics)
 	require.NoError(t, err)
@@ -185,7 +184,7 @@ func Test_dbErrorIsRetryable(t *testing.T) {
 // 	t.Run("Get gauge metric", func(t *testing.T) {
 // 		metricName := "test_gauge"
 // 		metricValue := 123.45
-	
+
 // rows := sqlmock.NewRows([]string{"value"}).AddRow(metricValue)
 // 		mock.ExpectQuery(`SELECT value FROM gauges WHERE id = $1`).WithArgs(metricName).WillReturnRows(rows)
 
@@ -198,7 +197,7 @@ func Test_dbErrorIsRetryable(t *testing.T) {
 // 	t.Run("Get counter metric", func(t *testing.T) {
 // 		metricName := "test_counter"
 // 		metricValue := int64(123)
-	
+
 // rows := sqlmock.NewRows([]string{"value"}).AddRow(metricValue)
 // 		mock.ExpectQuery(`SELECT value FROM counters WHERE id = $1`).WithArgs(metricName).WillReturnRows(rows)
 
@@ -252,8 +251,7 @@ func TestDBStorage_RetryableErrors(t *testing.T) {
 			WithArgs(metricName, metricValue).
 			WillReturnError(retryableErr)
 
-	
-rows := sqlmock.NewRows([]string{"value"}).AddRow(expectedValue)
+		rows := sqlmock.NewRows([]string{"value"}).AddRow(expectedValue)
 		mock.ExpectQuery("INSERT INTO counters").
 			WithArgs(metricName, metricValue).
 			WillReturnRows(rows)
@@ -307,8 +305,7 @@ func Test_populateMetrics_RowError(t *testing.T) {
 	dest := make(map[string]float64)
 	tableName := "gauges"
 
-
-rows := sqlmock.NewRows([]string{"id", "value"}).
+	rows := sqlmock.NewRows([]string{"id", "value"}).
 		AddRow("g1", 1.1).
 		AddRow("g2", "not-a-float") // This will cause a scan error
 
@@ -382,7 +379,7 @@ func TestDBStorage_UpdateGauge_Retry(t *testing.T) {
 	pgErr := &pgconn.PgError{Code: "40001"} // Serialization Failure
 
 	mock.ExpectExec("INSERT INTO gauges").WithArgs(name, value).WillReturnError(pgErr)
-mock.ExpectExec("INSERT INTO gauges").WithArgs(name, value).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec("INSERT INTO gauges").WithArgs(name, value).WillReturnResult(sqlmock.NewResult(1, 1))
 
 	s.UpdateGauge(name, value)
 
@@ -400,7 +397,7 @@ func TestDBStorage_UpdateCounter_Retry(t *testing.T) {
 	pgErr := &pgconn.PgError{Code: "40P01"} // Deadlock
 
 	mock.ExpectQuery("INSERT INTO counters").WithArgs(name, value).WillReturnError(pgErr)
-mock.ExpectQuery("INSERT INTO counters").WithArgs(name, value).WillReturnRows(sqlmock.NewRows([]string{"value"}).AddRow(5))
+	mock.ExpectQuery("INSERT INTO counters").WithArgs(name, value).WillReturnRows(sqlmock.NewRows([]string{"value"}).AddRow(5))
 
 	s.UpdateCounter(name, value)
 
@@ -526,7 +523,6 @@ func Test_populateMetrics_RowsErr(t *testing.T) {
 	dest := make(map[string]float64)
 	rowsErr := errors.New("rows iteration error")
 
-
 	rows := sqlmock.NewRows([]string{"id", "value"}).AddRow("g1", 1.1).RowError(0, rowsErr)
 	mock.ExpectQuery("SELECT id, value FROM gauges").WillReturnRows(rows)
 
@@ -546,8 +542,8 @@ func TestDBStorage_GetJSONMetricsByTypeAndName_MarshalError(t *testing.T) {
 	metricName := "test_gauge"
 	metricValue := string(make([]byte, 1<<20)) // A large string to potentially cause issues
 
-rows := sqlmock.NewRows([]string{"value"}).AddRow(metricValue)
-mock.ExpectQuery(`SELECT value FROM gauges WHERE id = $1`).WithArgs(metricName).WillReturnRows(rows)
+	rows := sqlmock.NewRows([]string{"value"}).AddRow(metricValue)
+	mock.ExpectQuery(`SELECT value FROM gauges WHERE id = $1`).WithArgs(metricName).WillReturnRows(rows)
 
 	_, err = s.GetJSONMetricsByTypeAndName(metricName, "gauge")
 	assert.Error(t, err) // Expecting a scan error because we are trying to scan a string into a float64

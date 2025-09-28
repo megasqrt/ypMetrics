@@ -23,7 +23,7 @@ func NewHandler(s store.Storage) Handler {
 }
 
 func (h *Handler) updateHandler(w http.ResponseWriter, r *http.Request) {
-	
+
 	vars := mux.Vars(r)
 
 	metricType := vars["type"]
@@ -78,52 +78,52 @@ func (h *Handler) metricsHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) metricsHTMLHandler(w http.ResponseWriter, r *http.Request) {
 
-    metrics := h.storage.GetAllMetrics()
-    
-    html:= models.HTMLHead
+	metrics := h.storage.GetAllMetrics()
 
-    if gauges, ok := metrics["gauges"].(map[string]float64); ok && len(gauges) > 0 {
-        html += `<div class="metric-section">
+	html := models.HTMLHead
+
+	if gauges, ok := metrics["gauges"].(map[string]float64); ok && len(gauges) > 0 {
+		html += `<div class="metric-section">
             <h2>Gauge Metrics</h2>`
-        
-        for name, value := range gauges {
-            html += fmt.Sprintf(`
+
+		for name, value := range gauges {
+			html += fmt.Sprintf(`
             <div class="metric-item">
                 <span class="metric-name">%s:</span>
                 <span class="metric-value">%.2f</span>
             </div>`, name, value)
-        }
-        html += `</div>`
-    }
+		}
+		html += `</div>`
+	}
 
-    if counters, ok := metrics["counters"].(map[string]int64); ok && len(counters) > 0 {
-        html += `<div class="metric-section">
+	if counters, ok := metrics["counters"].(map[string]int64); ok && len(counters) > 0 {
+		html += `<div class="metric-section">
             <h2>Counter Metrics</h2>`
-        
-        for name, value := range counters {
-            html += fmt.Sprintf(`
+
+		for name, value := range counters {
+			html += fmt.Sprintf(`
             <div class="metric-item">
                 <span class="metric-name">%s:</span>
                 <span class="metric-value">%d</span>
             </div>`, name, value)
-        }        
-        html += `</div>`
-    }
+		}
+		html += `</div>`
+	}
 
-    if len(metrics) == 0 {
-        html += `<p>No metrics available</p>`
-    }
+	if len(metrics) == 0 {
+		html += `<p>No metrics available</p>`
+	}
 
-    html += `</body></html>`
+	html += `</body></html>`
 
-    w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	
+
 	_, err := io.WriteString(w, html)
-    if err != nil {
-        http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-        return
-    }
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *Handler) getMetricHandler(w http.ResponseWriter, r *http.Request) {
@@ -132,20 +132,20 @@ func (h *Handler) getMetricHandler(w http.ResponseWriter, r *http.Request) {
 	metricType := vars["type"]
 	metricName := vars["name"]
 
-	if metricName == "" || metricType == ""{
+	if metricName == "" || metricType == "" {
 		http.Error(w, "Invalid URL format", http.StatusNotFound)
 		return
 	}
 
-	jsonData, err:= h.storage.GetMetricsByTypeAndName(metricName, metricType)
-	if err!=nil{
+	jsonData, err := h.storage.GetMetricsByTypeAndName(metricName, metricType)
+	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprintf(w, "ERROR Handler: %s", err)
 	} else {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(jsonData)
-	}	
+	}
 }
 
 func (h *Handler) dbPingHandler(w http.ResponseWriter, r *http.Request) {

@@ -12,11 +12,11 @@ import (
 )
 
 type MockStorage struct {
-	Gauges                      map[string]float64
-	Counters                    map[string]int64
-	UpdateGaugeFunc             func(name string, value float64)
-	UpdateCounterFunc           func(name string, value int64) int64
-	GetMetricsByTypeAndNameFunc func(mName, mType string) ([]byte, error)
+	Gauges                          map[string]float64
+	Counters                        map[string]int64
+	UpdateGaugeFunc                 func(name string, value float64)
+	UpdateCounterFunc               func(name string, value int64) int64
+	GetMetricsByTypeAndNameFunc     func(mName, mType string) ([]byte, error)
 	GetJSONMetricsByTypeAndNameFunc func(mName, mType string) ([]byte, error)
 }
 

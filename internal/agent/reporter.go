@@ -130,8 +130,8 @@ func (r *HTTPReporter) sendGzippedJSON(url string, data interface{}) error {
 		req.Header.Set("Content-Encoding", "gzip")
 
 		if r.hashKey != "" {
-			hash:= helper.CalculateHashString(jsonData, r.hashKey)
-		
+			hash := helper.CalculateHashString(jsonData, r.hashKey)
+
 			req.Header.Set("HashSHA256", hash)
 		}
 

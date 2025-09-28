@@ -16,8 +16,8 @@ type hashMiddleware struct {
 
 type hashResponseWriter struct {
 	http.ResponseWriter
-	body       *bytes.Buffer
-	key string
+	body          *bytes.Buffer
+	key           string
 	statusCodeSet bool
 }
 
@@ -25,9 +25,8 @@ func NewHashMiddleware(key string) *hashMiddleware {
 	return &hashMiddleware{key: key}
 }
 
-
-//iter 14 При наличии ключа во время обработки запроса сервер должен
-//  проверять соответствие полученного и вычисленного хеша.	
+// iter 14 При наличии ключа во время обработки запроса сервер должен
+// проверять соответствие полученного и вычисленного хеша.
 func (hm hashMiddleware) HashMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("key is %s", hm.key)
@@ -35,12 +34,12 @@ func (hm hashMiddleware) HashMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		
+
 		clientHashString := r.Header.Get("HashSHA256")
-		if  clientHashString == ""{
+		if clientHashString == "" {
 			log.Print("missing hash header")
 			next.ServeHTTP(w, r)
-			return 
+			return
 		}
 
 		if r.Body == nil {
@@ -57,7 +56,6 @@ func (hm hashMiddleware) HashMiddleware(next http.Handler) http.Handler {
 		r.Body.Close()
 		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
-
 		//iter 14 При несовпадении сервер должен отбрасывать полученные данные
 		//  и возвращать http.StatusBadRequest.
 		// serverHash:= helper.CalculateHashByte(bodyBytes, hm.key)
@@ -70,7 +68,6 @@ func (hm hashMiddleware) HashMiddleware(next http.Handler) http.Handler {
 			ResponseWriter: w,
 			body:           &bytes.Buffer{},
 			key:            hm.key,
-			
 		}
 
 		next.ServeHTTP(hrw, r)
@@ -78,20 +75,19 @@ func (hm hashMiddleware) HashMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-
 func (hrw *hashResponseWriter) WriteHeader(statusCode int) {
 	hrw.ResponseWriter.WriteHeader(statusCode)
 	//hw.statusCodeSet = true
 }
 
-//iter 14 При наличии ключа на этапе формирования ответа
-//  сервер должен вычислять хеш и передавать его в HTTP-заголовке ответа
-//  с именем HashSHA256.
+// iter 14 При наличии ключа на этапе формирования ответа
+// сервер должен вычислять хеш и передавать его в HTTP-заголовке ответа
+// с именем HashSHA256.
 func (hrw *hashResponseWriter) Write(b []byte) (int, error) {
 	hrw.body.Write(b)
-	if hrw.key == "" && hrw.body.Len() > 0{
+	if hrw.key == "" && hrw.body.Len() > 0 {
 		responseHash := helper.CalculateHashString(hrw.body.Bytes(), hrw.key)
-		hrw.Header().Set("HashSHA256", responseHash)	
+		hrw.Header().Set("HashSHA256", responseHash)
 	}
 	return hrw.ResponseWriter.Write(b)
 }

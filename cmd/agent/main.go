@@ -168,7 +168,7 @@ func parseConfig() config {
 	helper.AssignFromViperIfSet(&pollInterval, "POLL_INTERVAL", viper.GetInt, defaultPollInterval)
 	helper.AssignFromViperIfSet(&hashKey, "KEY", viper.GetString, defaultHashKey)
 	helper.AssignFromViperIfSet(&rateLimit, "RATE_LIMIT", viper.GetInt, defaultRateLimit)
-	
+
 	if !govalidator.IsURL(serverAddress) {
 		log.Fatalf("некорректный URL сервера: %s", serverAddress)
 	}
