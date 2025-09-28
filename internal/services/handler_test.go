@@ -91,7 +91,7 @@ func TestUpdateHandler(t *testing.T) {
 				Gauges:   make(map[string]float64),
 				Counters: make(map[string]int64),
 			}
-			handler := NewHandler(mockStorage)
+			handler := NewHandler(mockStorage, nil)
 			request, _ := http.NewRequest(http.MethodPost, "/update", nil)
 			record := httptest.NewRecorder()
 			vars := map[string]string{
@@ -117,7 +117,7 @@ func TestGetMetricHandler(t *testing.T) {
 	mockStorage.WithGauge( "temperature", 36.6).
 				WithCounter("requests", 42)
     
-	handler := NewHandler(mockStorage)
+	handler := NewHandler(mockStorage, nil)
 
 
 	type want struct {

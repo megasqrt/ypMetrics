@@ -1,6 +1,7 @@
 package services
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,11 +15,13 @@ import (
 
 type Handler struct {
 	storage store.Storage
+	db 		*sql.DB
 }
 
-func NewHandler(s store.Storage) Handler {
+func NewHandler(s store.Storage,db *sql.DB) Handler {
 	return Handler{
 		storage: s,
+		db: db,
 	}
 }
 
@@ -147,4 +150,16 @@ func (h *Handler) getMetricHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write(jsonData)
 	}	
+}
+
+func (h *Handler) dbPingHandler(w http.ResponseWriter, r *http.Request) {
+	if h.db == nil {
+		http.Error(w, "database connection is not set up", http.StatusInternalServerError)
+		return
+	}
+	if err := h.db.PingContext(r.Context()); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "ERROR Handler: %s", err)
+	}
+		w.WriteHeader(http.StatusOK)
 }

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"database/sql"
 	"net/http"
 	"os"
 
@@ -11,11 +12,11 @@ import (
 	zlog "github.com/rs/zerolog/log"
 )
 
-func NewMetricServer(address string, s store.Storage) *http.Server {
+func NewMetricServer(address string, s store.Storage, db *sql.DB) *http.Server {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	zlog.Logger = zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	handlers := &Handler{storage: s}
+	handlers := NewHandler(s,db)
 
 	router := mux.NewRouter()
 	router.Use(LoggingMiddleware,GzipMiddleware)
@@ -32,6 +33,8 @@ func NewMetricServer(address string, s store.Storage) *http.Server {
 	router.HandleFunc("/metrics", handlers.metricsHandler).Methods(http.MethodPost)
 	
 	router.HandleFunc("/", handlers.metricsHTMLHandler).Methods(http.MethodGet)
+
+	router.HandleFunc("/ping", handlers.dbPingHandler).Methods(http.MethodGet)
 
 	return &http.Server{
 		Addr:    address,
