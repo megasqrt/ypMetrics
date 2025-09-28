@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"flag"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"ypMetrics/models"
 )
 
@@ -78,9 +80,16 @@ func TestSendMetrics(t *testing.T) {
 	var receivedMetrics []models.Metrics
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/update/", r.URL.Path)
+		assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
+
+		gz, err := gzip.NewReader(r.Body)
+		require.NoError(t, err)
+		defer gz.Close()
+
 		var m models.Metrics
-		err := json.NewDecoder(r.Body).Decode(&m)
-		assert.NoError(t, err)
+		err = json.NewDecoder(gz).Decode(&m)
+		require.NoError(t, err)
+
 		receivedMetrics = append(receivedMetrics, m)
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -153,7 +162,6 @@ func TestFlagParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Каждый тест должен иметь свой собственный набор флагов для изоляции
 			fs := flag.NewFlagSet(tt.name, flag.ContinueOnError)
 
 			var (
@@ -162,7 +170,6 @@ func TestFlagParsing(t *testing.T) {
 				pollInt   int
 			)
 
-			// Определяем флаги как в main.go
 			fs.StringVar(&addr, "a", "localhost:8080", "server address")
 			fs.IntVar(&reportInt, "r", 10, "report interval")
 			fs.IntVar(&pollInt, "p", 2, "poll interval")

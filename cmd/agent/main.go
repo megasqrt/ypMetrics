@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"flag"
@@ -34,7 +35,6 @@ func NewMetricsAgent(serverAddress string, pollInterval, reportInterval time.Dur
 		serverAddress:  serverAddress,
 		pollInterval:   pollInterval,
 		reportInterval: reportInterval,
-		// metrics:        make(map[string]interface{}),
 	}
 }
 
@@ -148,13 +148,32 @@ func (a *MetricsAgent) startReporting() {
 func (a *MetricsAgent) sendMetrics() {
 	for _, m := range a.metrics {
 		url := fmt.Sprintf("http://%s/update/", a.serverAddress)
-		
-		data, err := json.Marshal(m)
-        if err != nil {
-            continue
-        }
 
-		resp, err := http.Post(url, "application/json", bytes.NewBuffer(data))
+		data, err := json.Marshal(m)
+		if err != nil {
+			continue
+		}
+
+		var buf bytes.Buffer
+		gz := gzip.NewWriter(&buf)
+		if _, err := gz.Write(data); err != nil {
+			log.Printf("Error compressing data for metric %s: %v", m.ID, err)
+			continue
+		}
+		if err := gz.Close(); err != nil {
+			log.Printf("Error closing gzip writer for metric %s: %v", m.ID, err)
+			continue
+		}
+
+		req, err := http.NewRequest(http.MethodPost, url, &buf)
+		if err != nil {
+			log.Printf("Error creating request for metric %s: %v", m.ID, err)
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Encoding", "gzip")
+
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			log.Printf("Error sending metric %s: %v", m.ID, err)
 			continue
