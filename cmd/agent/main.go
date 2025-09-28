@@ -138,7 +138,11 @@ func (a *MetricsAgent) incrementPollCount() {
 func (a *MetricsAgent) startReporting() {
 	ticker := time.NewTicker(a.reportInterval)
 	for range ticker.C {
-		a.sendMetrics()
+		if a.pingServer() {
+			a.sendMetricsBatch()
+		} else {
+			a.sendMetrics()
+		}
 	}
 }
 
@@ -179,6 +183,52 @@ func (a *MetricsAgent) sendMetrics() {
 	}
 }
 
+func (a *MetricsAgent) sendMetricsBatch() {
+	url := fmt.Sprintf("http://%s/updates/", a.serverAddress)
+
+	data, err := json.Marshal(a.metrics)
+	if err != nil {
+		log.Printf("Error marshaling metrics: %v", err)
+		return
+	}
+
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	if _, err := gz.Write(data); err != nil {
+		log.Printf("Error compressing data: %v", err)
+		return
+	}
+	if err := gz.Close(); err != nil {
+		log.Printf("Error closing gzip writer: %v", err)
+		return
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, &buf)
+	if err != nil {
+		log.Printf("Error creating request: %v", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("Error sending metrics batch: %v", err)
+		return
+	}
+	resp.Body.Close()
+}
+
+func (a *MetricsAgent) pingServer() bool {
+	resp, err := http.Get(fmt.Sprintf("http://%s/ping", a.serverAddress))
+	if err != nil {
+		log.Printf("Server ping failed: %v. Falling back to single metric updates.", err)
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
+
 var (
 	serverAddress  string
 	reportInterval int
@@ -190,7 +240,7 @@ type config struct {
 	pollInterval   time.Duration
 	reportInterval time.Duration
 }
-
+	
 func init() {
 	flag.StringVar(&serverAddress, "a", "localhost:8080", "server adress")
 	flag.IntVar(&reportInterval, "r", 10, "report interval")

@@ -196,7 +196,7 @@ func (s *DBStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
 
 	counterStmt, err := tx.PrepareContext(context.Background(), `
         INSERT INTO counters (id, value) VALUES ($1, $2)
-        ON CONFLICT (id) DO UPDATE SET value = counter.value + EXCLUDED.value;
+        ON CONFLICT (id) DO UPDATE SET value = counters.value + EXCLUDED.value;
     `)
 	if err != nil {
 		return fmt.Errorf("failed to prepare counter statement: %w", err)
