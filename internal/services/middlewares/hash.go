@@ -6,8 +6,6 @@ import (
 	"ypMetrics/internal/helper"
 
 	"bytes"
-	//"crypto/hmac"
-	//"encoding/hex"
 
 	"github.com/rs/zerolog/log"
 )
@@ -45,12 +43,6 @@ func (hm hashMiddleware) HashMiddleware(next http.Handler) http.Handler {
 			return 
 		}
 
-		// clientHashByte, err := hex.DecodeString(clientHashString)
-		// if err != nil {
-		// 	http.Error(w, "Error decode request hash", http.StatusBadRequest)
-		// 	return
-		// }
-
 		if r.Body == nil {
 			next.ServeHTTP(w, r)
 			return
@@ -82,7 +74,6 @@ func (hm hashMiddleware) HashMiddleware(next http.Handler) http.Handler {
 		}
 
 		next.ServeHTTP(hrw, r)
-
 
 	})
 }

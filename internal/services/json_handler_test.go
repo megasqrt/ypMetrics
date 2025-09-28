@@ -12,6 +12,7 @@ import (
 
 	"ypMetrics/models"
 	"ypMetrics/internal/mocks"
+	"ypMetrics/internal/helper"
 )
 
 func TestUpdateMetricJSON(t *testing.T) {
@@ -31,12 +32,12 @@ func TestUpdateMetricJSON(t *testing.T) {
 			requestMetric: models.Metrics{
 				ID:    "TestGauge",
 				MType: "gauge",
-				Value: float64Ptr(123.45),
+				Value: helper.Float64Ptr(123.45),
 			},
 			expectedMetric: models.Metrics{
 				ID:    "TestGauge",
 				MType: "gauge",
-				Value: float64Ptr(123.45),
+				Value: helper.Float64Ptr(123.45),
 			},
 			expectedStatus: http.StatusOK,
 		},
@@ -49,12 +50,12 @@ func TestUpdateMetricJSON(t *testing.T) {
 			requestMetric: models.Metrics{
 				ID:    "TestCounter",
 				MType: "counter",
-				Delta: int64Ptr(10),
+				Delta: helper.Int64Ptr(10),
 			},
 			expectedMetric: models.Metrics{
 				ID:    "TestCounter",
 				MType: "counter",
-				Delta: int64Ptr(10),
+				Delta: helper.Int64Ptr(10),
 			},
 			expectedStatus: http.StatusOK,
 		},
@@ -67,12 +68,12 @@ func TestUpdateMetricJSON(t *testing.T) {
 			requestMetric: models.Metrics{
 				ID:    "TestCounter",
 				MType: "counter",
-				Delta: int64Ptr(5),
+				Delta: helper.Int64Ptr(5),
 			},
 			expectedMetric: models.Metrics{
 				ID:    "TestCounter",
 				MType: "counter",
-				Delta: int64Ptr(25), // 20 + 5
+				Delta: helper.Int64Ptr(25), // 20 + 5
 			},
 			expectedStatus: http.StatusOK,
 		},
@@ -165,7 +166,7 @@ func TestGetMetricJSON(t *testing.T) {
 			expectedMetric: models.Metrics{
 				ID:    "TestGauge",
 				MType: "gauge",
-				Value: float64Ptr(99.9),
+				Value: helper.Float64Ptr(99.9),
 			},
 			expectedStatus: http.StatusOK,
 		},
@@ -178,7 +179,7 @@ func TestGetMetricJSON(t *testing.T) {
 			expectedMetric: models.Metrics{
 				ID:    "TestCounter",
 				MType: "counter",
-				Delta: int64Ptr(42),
+				Delta: helper.Int64Ptr(42),
 			},
 			expectedStatus: http.StatusOK,
 		},
@@ -210,6 +211,3 @@ func TestGetMetricJSON(t *testing.T) {
 		})
 	}
 }
-
-func float64Ptr(v float64) *float64 { return &v }
-func int64Ptr(v int64) *int64    { return &v }

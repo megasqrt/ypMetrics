@@ -72,3 +72,6 @@ func JSONErrorWithMesage(w http.ResponseWriter, status int, msg string) {
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
+
+func Float64Ptr(v float64) *float64 { return &v }
+func Int64Ptr(v int64) *int64    { return &v }

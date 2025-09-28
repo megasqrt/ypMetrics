@@ -12,6 +12,8 @@ import (
 	"ypMetrics/internal/services"
 	"ypMetrics/internal/store"
 	"ypMetrics/internal/misc"
+	"net/http"
+	_ "net/http/pprof"
 
 
 	"github.com/spf13/viper"
@@ -95,6 +97,13 @@ func main() {
 	}
 
 	server := services.NewMetricServer(cfg, storage)
+
+	go func() {
+		log.Println("Starting pprof server on :6060")
+		if err := http.ListenAndServe(":6060", nil); err != nil {
+			log.Fatalf("pprof server error: %v", err)
+		}
+	}()
 
 	go func() {
 		log.Printf("Starting server on %s", cfg.ServerAddress)
