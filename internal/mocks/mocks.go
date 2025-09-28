@@ -1,10 +1,11 @@
 package mocks
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"context"
+	"log"
 
 	"ypMetrics/internal/store"
 	"ypMetrics/models"
@@ -81,6 +82,7 @@ func (m *MockStorage) GetMetricsByTypeAndName(mName, mType string) ([]byte, erro
 }
 
 func (m *MockStorage) GetJSONMetricsByTypeAndName(mName, mType string) ([]byte, error) {
+	log.Println("GetJSONMetricsByTypeAndName mock")
 	value, found, err := m.getMetricValue(mName, mType)
 	if err != nil {
 		return nil, err

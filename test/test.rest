@@ -55,13 +55,14 @@ POST  http://localhost:8080/update/
 }
 
 ### 
-POST  http://localhost:8080/value/
+POST  http://localhost:8989/value/
 
-{
-    
-    "id": "RandomValue",
-    "type": "gauge"
-}
+{"id":"PollCount","type":"counter"}
+
+### 
+POST  http://localhost:8989/value/
+
+{"method": "gauge", "name": "BuckHashSys", "static": true}
 
 
 ### 

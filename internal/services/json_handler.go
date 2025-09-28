@@ -1,24 +1,28 @@
 package services
 
 import (
-    "encoding/json"
-    "net/http"
-    "ypMetrics/models"
+	"encoding/json"
+	"log"
+	"net/http"
+	"ypMetrics/internal/helper"
+	"ypMetrics/models"
 )
 
-func (h *Handler)UpdateMetricJSON(w http.ResponseWriter, r *http.Request){
+func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	var m models.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		log.Printf("Error update decoding JSON: %s \n", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if m.ID == "" || (m.MType != "gauge" && m.MType != "counter") {
+		log.Printf("invalid metric data type %s \n", m.MType)
 		http.Error(w, "invalid metric data", http.StatusBadRequest)
 		return
 	}
-
+	log.Printf("mType %s \n ID %s \n", m.MType, m.ID)
 	switch m.MType {
 	case "gauge":
 		if m.Value == nil {
@@ -36,6 +40,7 @@ func (h *Handler)UpdateMetricJSON(w http.ResponseWriter, r *http.Request){
 
 	updatedMetric, err := h.storage.GetJSONMetricsByTypeAndName(m.ID, m.MType)
 	if err != nil {
+		log.Printf("could not retrieve updated metric: %s \n", err)
 		http.Error(w, "could not retrieve updated metric", http.StatusInternalServerError)
 		return
 	}
@@ -44,20 +49,22 @@ func (h *Handler)UpdateMetricJSON(w http.ResponseWriter, r *http.Request){
 	w.Write(updatedMetric)
 }
 
-func (h *Handler)GetMetricJSON(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	var m models.Metrics
+	w.Header().Set("Content-Type", "application/json")
+
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		log.Printf("Error decoding JSON: %s \n", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	metricJSON, err := h.storage.GetJSONMetricsByTypeAndName(m.ID, m.MType)
-	
 	if err != nil {
-		http.Error(w, "metric not found", http.StatusNotFound)
+		log.Printf("json metric error: %s \n", err)
+		helper.JSONErrorWithMesage(w, http.StatusNotFound, "json metric not found")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.Write(metricJSON)
 }

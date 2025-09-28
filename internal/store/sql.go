@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +13,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -20,6 +21,9 @@ import (
 type DBStorage struct {
 	db *sql.DB
 }
+
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 func NewDBStorage(db *sql.DB) (Storage, error) {
 	storage := &DBStorage{db: db}
@@ -30,19 +34,24 @@ func NewDBStorage(db *sql.DB) (Storage, error) {
 }
 
 func (s *DBStorage) initSchema() error {
-	driver, err := postgres.WithInstance(s.db, &postgres.Config{})
+	pgDriver, err := postgres.WithInstance(s.db, &postgres.Config{})
 	if err != nil {
 		return fmt.Errorf("could not create postgres driver: %w", err)
 	}
 
+	sourceInstance, err := iofs.New(migrationsFS, "migrations")
+	if err != nil {
+		return fmt.Errorf("could not create source instance from embedded fs: %w", err)
+	}
 
-	m, err := migrate.NewWithDatabaseInstance("file://internal/store/migrations", "postgres", driver)
+	//m, err := migrate.NewWithSourceInstance("iofs", sourceInstance, "postgres")
+	m, err := migrate.NewWithInstance("iofs", sourceInstance, "postgres", pgDriver)
 	if err != nil {
 		return fmt.Errorf("could not create migrate instance: %w", err)
 	}
 
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		return  fmt.Errorf("could not run up migrations: %w", err)
+		return fmt.Errorf("could not run up migrations: %w", err)
 	}
 
 	return nil
@@ -56,7 +65,8 @@ func (s *DBStorage) UpdateGauge(name string, value float64) {
     `
 	err := helper.Retryer(func() error {
 		_, err := s.db.Exec(query, name, value)
-		return err },
+		return err
+	},
 		dbErrorIsRetryable)
 	if err != nil {
 		log.Printf("Error updating gauge in DB: %v", err)
@@ -73,7 +83,8 @@ func (s *DBStorage) UpdateCounter(name string, value int64) int64 {
 	var newDelta int64
 	err := helper.Retryer(func() error {
 		err := s.db.QueryRow(query, name, value).Scan(&newDelta)
-		return err },
+		return err
+	},
 		dbErrorIsRetryable)
 	if err != nil {
 		log.Printf("Error updating counter in DB: %v", err)
@@ -88,7 +99,7 @@ func populateMetrics[T float64 | int64](db *sql.DB, tableName string, dest map[s
 	var err error
 	retryErr := helper.Retryer(func() error {
 		rows, err = db.Query(query)
-		if err!=nil{
+		if err != nil {
 			return err
 		}
 		defer rows.Close()
@@ -106,13 +117,14 @@ func populateMetrics[T float64 | int64](db *sql.DB, tableName string, dest map[s
 			log.Printf("Error during %s rows iteration: %v", tableName, err)
 		}
 
-		return nil },
+		return nil
+	},
 		dbErrorIsRetryable)
 	if retryErr != nil {
 		log.Printf("Error getting %s from DB: %v", tableName, retryErr)
 		return
 	}
-	
+
 }
 
 func (s *DBStorage) GetAllMetrics() map[string]interface{} {
@@ -167,6 +179,7 @@ func (s *DBStorage) GetMetricsByTypeAndName(name, mtype string) ([]byte, error) 
 }
 
 func (s *DBStorage) GetJSONMetricsByTypeAndName(name, mtype string) ([]byte, error) {
+	log.Println("GetJSONMetricsByTypeAndName db")
 	metric := models.Metrics{ID: name, MType: mtype}
 
 	switch mtype {
@@ -176,7 +189,7 @@ func (s *DBStorage) GetJSONMetricsByTypeAndName(name, mtype string) ([]byte, err
 			if !errors.Is(err, sql.ErrNoRows) {
 				log.Printf("Error getting gauge %s from DB: %v", name, err)
 			}
-			return nil, fmt.Errorf("metric not found")
+			return nil, fmt.Errorf("metric guage not found in db")
 		}
 		metric.Value = value
 		return json.Marshal(metric)
@@ -186,12 +199,12 @@ func (s *DBStorage) GetJSONMetricsByTypeAndName(name, mtype string) ([]byte, err
 			if !errors.Is(err, sql.ErrNoRows) {
 				log.Printf("Error getting counter %s from DB: %v", name, err)
 			}
-			return nil, fmt.Errorf("metric not found")
+			return nil, fmt.Errorf("metric counter not found in db")
 		}
 		metric.Delta = value
 		return json.Marshal(metric)
 	default:
-		return nil, fmt.Errorf("metric not found")
+		return nil, fmt.Errorf("metric of type %s not found in db", mtype)
 	}
 }
 
@@ -251,22 +264,22 @@ func (s *DBStorage) Ping(ctx context.Context) error {
 }
 
 func dbErrorIsRetryable(err error) bool {
-		var pgErr *pgconn.PgError
+	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		// Полный список кодов ошибок: https://www.postgresql.org/docs/current/errcodes-appendix.html
 		switch pgErr.Code {
 		// Ошибки, связанные с временной недоступностью или проблемами соединения.
-		case pgerrcode.AdminShutdown,      // 57P01: Сервер закрывает соединение.
-			pgerrcode.CannotConnectNow,     // 57P03: Сервер еще не готов принимать подключения.
-			pgerrcode.ConnectionFailure,    // 08006: Обрыв соединения.
+		case pgerrcode.AdminShutdown, // 57P01: Сервер закрывает соединение.
+			pgerrcode.CannotConnectNow,       // 57P03: Сервер еще не готов принимать подключения.
+			pgerrcode.ConnectionFailure,      // 08006: Обрыв соединения.
 			pgerrcode.ConnectionDoesNotExist, // 08003: Соединение не существует.
-			pgerrcode.TooManyConnections:   // 53300: Слишком много подключений.
+			pgerrcode.TooManyConnections:     // 53300: Слишком много подключений.
 			return true
 
 		// Ошибки, связанные с конфликтами транзакций, которые можно разрешить повторной попыткой.
 		case pgerrcode.SerializationFailure, // 40001: Ошибка сериализации транзакции.
-			pgerrcode.DeadlockDetected,     // 40P01: Обнаружена взаимная блокировка (deadlock).
-			pgerrcode.LockNotAvailable:       // 55P03: Ресурс заблокирован другой транзакцией.
+			pgerrcode.DeadlockDetected, // 40P01: Обнаружена взаимная блокировка (deadlock).
+			pgerrcode.LockNotAvailable: // 55P03: Ресурс заблокирован другой транзакцией.
 			return true
 		}
 	}

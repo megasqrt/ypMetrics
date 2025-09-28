@@ -106,6 +106,7 @@ func (s *MemStorage) GetMetricsByTypeAndName(mName, mType string) ([]byte, error
 }
 
 func (s *MemStorage) GetJSONMetricsByTypeAndName(mName, mType string) ([]byte, error) {
+	log.Println("GetJSONMetricsByTypeAndName memory")
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -125,7 +126,7 @@ func (s *MemStorage) GetJSONMetricsByTypeAndName(mName, mType string) ([]byte, e
 			return json.Marshal(metric)
 		}
 	}
-	return nil, fmt.Errorf("metric not found")
+	return nil, fmt.Errorf("metric not found in memory")
 }
 
 func (s *MemStorage) UpdateMetricsBatch(metrics []models.Metrics) error {

@@ -5,20 +5,22 @@ import (
 	"os"
 
 	"ypMetrics/internal/store"
-
+	"ypMetrics/internal/misc"
+	"ypMetrics/internal/services/middlewares"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	zlog "github.com/rs/zerolog/log"
 )
 
-func NewMetricServer(address string, s store.Storage) *http.Server {
+func NewMetricServer(cfg misc.Config, s store.Storage) *http.Server {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	zlog.Logger = zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	handlers := NewHandler(s)
 
 	router := mux.NewRouter()
-	router.Use(LoggingMiddleware,GzipMiddleware)
+	HashMiddleware:=middlewares.NewHashMiddleware(cfg.HashKey)
+	router.Use(middlewares.LoggingMiddleware, HashMiddleware.HashMiddleware, middlewares.GzipMiddleware)
 
 
 	router.HandleFunc("/update/", handlers.UpdateMetricJSON).Methods(http.MethodPost)
@@ -37,7 +39,7 @@ func NewMetricServer(address string, s store.Storage) *http.Server {
 	router.HandleFunc("/ping", handlers.dbPingHandler).Methods(http.MethodGet)
 
 	return &http.Server{
-		Addr:    address,
+		Addr:    cfg.ServerAddress,
 		Handler: router,
 	}
 }
