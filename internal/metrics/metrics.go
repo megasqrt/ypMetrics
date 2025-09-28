@@ -132,8 +132,11 @@ func (s *MemStorage) GetJSONMetricsByTypeAndName(mName, mType string) ([]byte, e
 	return jsonData, nil
 }
 
+// FileStorer определяет интерфейс для сохранения и загрузки метрик из файла.
 type FileStorer interface {
+	// SaveMetrics сохраняет метрики из MemStorage в файл.
 	SaveMetrics(storage *MemStorage) error
+	// LoadMetrics загружает метрики из файла в MemStorage.
 	LoadMetrics(storage *MemStorage) error
 }
 

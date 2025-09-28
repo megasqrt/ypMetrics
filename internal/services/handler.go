@@ -16,12 +16,19 @@ type Handler struct {
 	storage store.Storage
 }
 
+// NewHandler создает новый экземпляр Handler с предоставленным хранилищем.
 func NewHandler(s store.Storage) Handler {
 	return Handler{
 		storage: s,
 	}
 }
 
+// updateHandler обрабатывает запросы на обновление метрик через URL.
+// Принимает метрики в формате /update/{type}/{name}/{value}.
+//
+//   - {type} — тип метрики (gauge или counter).
+//   - {name} — имя метрики.
+//   - {value} — значение метрики.
 func (h *Handler) updateHandler(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
@@ -60,10 +67,13 @@ func (h *Handler) updateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// errorHandler обрабатывает некорректные URL, возвращая ошибку 404 Not Found.
 func (h *Handler) errorHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Invalid URL format", http.StatusNotFound)
 }
 
+// metricsHandler возвращает все текущие метрики в формате JSON.
+// Используется для отладки и мониторинга.
 func (h *Handler) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	metrics := h.storage.GetAllMetrics()
 	jsonData, err := json.MarshalIndent(metrics, "", "  ")
@@ -76,6 +86,8 @@ func (h *Handler) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonData)
 }
 
+// metricsHTMLHandler отображает все метрики в виде HTML-страницы.
+// Предназначен для удобного просмотра метрик в браузере.
 func (h *Handler) metricsHTMLHandler(w http.ResponseWriter, r *http.Request) {
 
 	metrics := h.storage.GetAllMetrics()
@@ -148,6 +160,9 @@ func (h *Handler) getMetricHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// dbPingHandler проверяет соединение с базой данных.
+// Возвращает статус 200 OK, если соединение успешно,
+// и 500 Internal Server Error в противном случае.
 func (h *Handler) dbPingHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.storage.Ping(r.Context()); err != nil {
@@ -158,6 +173,9 @@ func (h *Handler) dbPingHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// UpdateMetricsBatchJSON обрабатывает пакетное обновление метрик.
+// Принимает в теле запроса JSON-массив метрик в формате []models.Metrics.
+// В случае успеха возвращает статус 200 OK.
 func (h *Handler) UpdateMetricsBatchJSON(w http.ResponseWriter, r *http.Request) {
 	var metrics []models.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {

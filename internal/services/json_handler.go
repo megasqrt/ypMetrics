@@ -8,6 +8,14 @@ import (
 	"ypMetrics/models"
 )
 
+// UpdateMetricJSON обрабатывает обновление одной метрики в формате JSON.
+// Принимает в теле запроса JSON-объект models.Metrics.
+//
+// Проверяет корректность типа метрики ("gauge" или "counter") и наличие
+// соответствующего поля (Value или Delta).
+//
+// В случае успеха обновляет метрику в хранилище и возвращает
+// обновленный JSON-объект метрики с кодом 200 OK.
 func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	var m models.Metrics
@@ -49,6 +57,11 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	w.Write(updatedMetric)
 }
 
+// GetMetricJSON возвращает метрику в формате JSON.
+// Принимает в теле запроса JSON-объект с полями "id" и "type".
+//
+// В случае успеха возвращает полный JSON-объект models.Metrics с кодом 200 OK.
+// Если метрика не найдена, возвращает 404 Not Found.
 func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	var m models.Metrics
 	w.Header().Set("Content-Type", "application/json")
