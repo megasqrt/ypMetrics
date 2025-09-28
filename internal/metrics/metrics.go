@@ -2,8 +2,9 @@ package metrics
 
 import (
 	"errors"
-	"fmt"
 	"encoding/json"
+	"fmt"
+	"ypMetrics/models"
 )
 
 type MemStorage struct {
@@ -17,12 +18,6 @@ func NewMemStorage() *MemStorage {
 		counters: make(map[string]int64),
 	}
 }
-
-// type StorageInterface interface {
-// 	UpdateGauge(name string, value float64)
-// 	UpdateCounter(name string, value int64) int64
-// 	GetAllMetrics() map[string]interface{}
-// }
 
 func (s *MemStorage) UpdateGauge(name string, value float64) {
 	s.gauges[name] = value
@@ -48,34 +43,63 @@ func (s *MemStorage) GetAllMetrics() map[string]interface{} {
 	return metrics
 }
 
-func (s *MemStorage) GetMetricsByTypeAndName(mName, mType string) ([]byte, error) {
-	var value interface{}
-	var found bool
-
+func (s *MemStorage) getMetricValue(mName, mType string) (interface{}, bool, error) {
 	switch mType {
 	case "gauge":
-		value, found = s.gauges[mName]
+		value, found := s.gauges[mName]
+		return value, found, nil
 	case "counter":
-		value, found = s.counters[mName]
+		value, found := s.counters[mName]
+		return value, found, nil
 	default:
-		return nil, errors.New("invalid metric type")
+		return nil, false, errors.New("invalid metric type")
+	}
+}
+
+func (s *MemStorage) GetMetricsByTypeAndName(mName, mType string) ([]byte, error) {
+	value, found, err := s.getMetricValue(mName, mType)
+	if err != nil {
+		return nil, err
 	}
 
 	if !found {
 		return nil, fmt.Errorf("metric '%s' of type '%s' not found", mName, mType)
 	}
 
-	// вдруг пригодиться 
-	// response := struct {
-    //     Value interface{} `json:"value"`
-    // }{
-    //     Value: value,
-    // }
-
 	jsonData, err := json.Marshal(value)
-		if err != nil {
-			return nil,fmt.Errorf("failed to marshal metric: %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal metric: %w", err)
 	}
 
+	return jsonData, nil
+}
+
+func (s *MemStorage) GetJSONMetricsByTypeAndName(mName, mType string) ([]byte, error) {
+	var value interface{}
+	var found bool
+
+	value, found, err := s.getMetricValue(mName, mType)
+	if err != nil {
+		return nil, err
+	}
+
+	if !found {
+		return nil, fmt.Errorf("metric '%s' of type '%s' not found", mName, mType)
+	}
+
+	metric := models.Metrics{ID: mName, MType: mType}
+	switch mType {
+	case "gauge":
+		v := value.(float64)
+		metric.Value = &v
+	case "counter":
+		v := value.(int64)
+		metric.Delta = &v
+	}
+
+	jsonData, err := json.Marshal(metric)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal metric object: %w", err)
+	}
 	return jsonData, nil
 }
