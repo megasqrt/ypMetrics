@@ -57,14 +57,14 @@ func (s *DBStorage) initSchema() error {
 	return nil
 }
 
-func (s *DBStorage) UpdateGauge(name string, value float64) {
+func (s *DBStorage) UpdateGauge(ctx context.Context, name string, value float64) {
 	query := `
     INSERT INTO gauges (id, value)
     VALUES ($1, $2)
     ON CONFLICT (id) DO UPDATE SET value = $2;
     `
 	err := helper.Retryer(func() error {
-		_, err := s.db.Exec(query, name, value)
+		_, err := s.db.ExecContext(ctx, query, name, value)
 		return err
 	},
 		dbErrorIsRetryable)
@@ -73,7 +73,7 @@ func (s *DBStorage) UpdateGauge(name string, value float64) {
 	}
 }
 
-func (s *DBStorage) UpdateCounter(name string, value int64) int64 {
+func (s *DBStorage) UpdateCounter(ctx context.Context, name string, value int64) int64 {
 	query := `
     INSERT INTO counters (id, value)
     VALUES ($1, $2)
@@ -82,7 +82,7 @@ func (s *DBStorage) UpdateCounter(name string, value int64) int64 {
     `
 	var newDelta int64
 	err := helper.Retryer(func() error {
-		err := s.db.QueryRow(query, name, value).Scan(&newDelta)
+		err := s.db.QueryRowContext(ctx, query, name, value).Scan(&newDelta)
 		return err
 	},
 		dbErrorIsRetryable)
@@ -208,15 +208,15 @@ func (s *DBStorage) GetJSONMetricsByTypeAndName(name, mtype string) ([]byte, err
 	}
 }
 
-func (s *DBStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
+func (s *DBStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.Metrics) error {
 	retryableFunc := func() error {
-		tx, err := s.db.Begin()
+		tx, err := s.db.BeginTx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("failed to begin transaction: %w", err)
 		}
 		defer tx.Rollback()
 
-		gaugeStmt, err := tx.PrepareContext(context.Background(), `
+		gaugeStmt, err := tx.PrepareContext(ctx, `
 			INSERT INTO gauges (id, value) VALUES ($1, $2)
 			ON CONFLICT (id) DO UPDATE SET value = EXCLUDED.value;
 		`)
@@ -225,7 +225,7 @@ func (s *DBStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
 		}
 		defer gaugeStmt.Close()
 
-		counterStmt, err := tx.PrepareContext(context.Background(), `
+		counterStmt, err := tx.PrepareContext(ctx, `
 			INSERT INTO counters (id, value) VALUES ($1, $2)
 			ON CONFLICT (id) DO UPDATE SET value = counters.value + EXCLUDED.value;
 		`)
@@ -238,13 +238,13 @@ func (s *DBStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
 			switch m.MType {
 			case models.Gauge:
 				if m.Value != nil {
-					if _, err := gaugeStmt.ExecContext(context.Background(), m.ID, *m.Value); err != nil {
+					if _, err := gaugeStmt.ExecContext(ctx, m.ID, *m.Value); err != nil {
 						return fmt.Errorf("failed to execute gauge statement for %s: %w", m.ID, err)
 					}
 				}
 			case models.Counter:
 				if m.Delta != nil {
-					if _, err := counterStmt.ExecContext(context.Background(), m.ID, *m.Delta); err != nil {
+					if _, err := counterStmt.ExecContext(ctx, m.ID, *m.Delta); err != nil {
 						return fmt.Errorf("failed to execute counter statement for %s: %w", m.ID, err)
 					}
 				}

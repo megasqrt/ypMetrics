@@ -2,7 +2,9 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,6 +15,8 @@ import (
 	"ypMetrics/internal/helper"
 	"ypMetrics/internal/mocks"
 	"ypMetrics/models"
+
+	"github.com/rs/zerolog"
 )
 
 func TestUpdateMetricJSON(t *testing.T) {
@@ -80,13 +84,16 @@ func TestUpdateMetricJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := NewHandler(tt.initialStorage)
+			// Создаем логгер, который ничего не выводит, для чистоты тестов
+			service := NewMetricService(tt.initialStorage, zerolog.New(io.Discard))
+			handler := NewHandler(service, zerolog.New(io.Discard))
 
 			body, err := json.Marshal(tt.requestMetric)
 			require.NoError(t, err)
 
 			req, err := http.NewRequest(http.MethodPost, "/update/", bytes.NewBuffer(body))
 			require.NoError(t, err)
+			req = req.WithContext(context.Background())
 
 			respRecord := httptest.NewRecorder()
 			handler.UpdateMetricJSON(respRecord, req)
@@ -135,9 +142,11 @@ func TestUpdateMetricJSON_InvalidData(t *testing.T) {
 			body, _ := json.Marshal(tt.request)
 			req, err := http.NewRequest(http.MethodPost, "/update/", bytes.NewBuffer(body))
 			require.NoError(t, err)
+			req = req.WithContext(context.Background())
 			resp := httptest.NewRecorder()
 
-			handler := NewHandler(&mocks.MockStorage{})
+			service := NewMetricService(&mocks.MockStorage{}, zerolog.New(io.Discard))
+			handler := NewHandler(service, zerolog.New(io.Discard))
 			handler.UpdateMetricJSON(resp, req)
 
 			assert.Equal(t, tt.expected, resp.Code)
@@ -195,7 +204,8 @@ func TestGetMetricJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := NewHandler(storage)
+			service := NewMetricService(storage, zerolog.New(io.Discard))
+			handler := NewHandler(service, zerolog.New(io.Discard))
 			body, err := json.Marshal(tt.requestMetric)
 			require.NoError(t, err)
 			req, err := http.NewRequest(http.MethodPost, "/value/", bytes.NewBuffer(body))

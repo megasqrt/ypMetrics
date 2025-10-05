@@ -1,6 +1,7 @@
 package services
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	"ypMetrics/internal/mocks"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,7 +32,6 @@ func TestUpdateHandler(t *testing.T) {
 			mValue: "10.5",
 			want: want{
 				statusCode: http.StatusOK,
-				body:       "Gauge Latency updated to",
 			},
 		},
 		{
@@ -40,7 +41,6 @@ func TestUpdateHandler(t *testing.T) {
 			mValue: "5",
 			want: want{
 				statusCode: http.StatusOK,
-				body:       "Counter Requests incremented by 5",
 			},
 		},
 		{
@@ -50,7 +50,7 @@ func TestUpdateHandler(t *testing.T) {
 			mValue: "abc",
 			want: want{
 				statusCode: http.StatusBadRequest,
-				body:       "Invalid gauge value\n",
+				body:       "invalid gauge value: strconv.ParseFloat: parsing \"abc\": invalid syntax\n",
 			},
 		},
 		{
@@ -60,7 +60,7 @@ func TestUpdateHandler(t *testing.T) {
 			mValue: "abc",
 			want: want{
 				statusCode: http.StatusBadRequest,
-				body:       "Invalid counter value\n",
+				body:       "invalid counter value: strconv.ParseInt: parsing \"abc\": invalid syntax\n",
 			},
 		},
 		{
@@ -70,7 +70,7 @@ func TestUpdateHandler(t *testing.T) {
 			mValue: "123",
 			want: want{
 				statusCode: http.StatusBadRequest,
-				body:       "Invalid metric type unknown\n",
+				body:       "invalid metric type unknown\n",
 			},
 		},
 		{
@@ -90,7 +90,8 @@ func TestUpdateHandler(t *testing.T) {
 				Gauges:   make(map[string]float64),
 				Counters: make(map[string]int64),
 			}
-			handler := NewHandler(mockStorage)
+			service := NewMetricService(mockStorage, zerolog.New(io.Discard))
+			handler := NewHandler(service, zerolog.New(io.Discard))
 			request, _ := http.NewRequest(http.MethodPost, "/update", nil)
 			record := httptest.NewRecorder()
 			vars := map[string]string{
@@ -102,7 +103,9 @@ func TestUpdateHandler(t *testing.T) {
 			handler.updateHandler(record, request)
 
 			assert.Equal(t, tt.want.statusCode, record.Code)
-			assert.Contains(t, record.Body.String(), tt.want.body)
+			if tt.want.body != "" {
+				assert.Contains(t, record.Body.String(), tt.want.body)
+			}
 		})
 	}
 }
@@ -116,7 +119,8 @@ func TestGetMetricHandler(t *testing.T) {
 	mockStorage.WithGauge("temperature", 36.6).
 		WithCounter("requests", 42)
 
-	handler := NewHandler(mockStorage)
+	service := NewMetricService(mockStorage, zerolog.New(io.Discard))
+	handler := NewHandler(service, zerolog.New(io.Discard))
 
 	type want struct {
 		statusCode int
@@ -152,7 +156,7 @@ func TestGetMetricHandler(t *testing.T) {
 			mName: "humidity",
 			want: want{
 				statusCode: http.StatusNotFound,
-				body:       `ERROR Handler: metric 'humidity' of type 'gauge' not found`,
+				body:       `Metric 'humidity' of type 'gauge' not found`,
 			},
 		},
 		{
@@ -161,7 +165,7 @@ func TestGetMetricHandler(t *testing.T) {
 			mName: "temperature",
 			want: want{
 				statusCode: http.StatusNotFound,
-				body:       `ERROR Handler: invalid metric type`,
+				body:       `Metric 'temperature' of type 'invalid' not found`,
 			},
 		},
 		{

@@ -42,7 +42,7 @@ func NewMemStorage(filePath string, storeInterval time.Duration, restore bool) (
 	return s, nil
 }
 
-func (s *MemStorage) UpdateGauge(name string, value float64) {
+func (s *MemStorage) UpdateGauge(ctx context.Context, name string, value float64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.gauges[name] = value
@@ -53,7 +53,7 @@ func (s *MemStorage) UpdateGauge(name string, value float64) {
 	}
 }
 
-func (s *MemStorage) UpdateCounter(name string, value int64) int64 {
+func (s *MemStorage) UpdateCounter(ctx context.Context, name string, value int64) int64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.counters[name] += value
@@ -129,7 +129,7 @@ func (s *MemStorage) GetJSONMetricsByTypeAndName(mName, mType string) ([]byte, e
 	return nil, fmt.Errorf("metric not found in memory")
 }
 
-func (s *MemStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
+func (s *MemStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.Metrics) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

@@ -50,7 +50,7 @@ func (hm hashMiddleware) HashMiddleware(next http.Handler) http.Handler {
 		bodyBytes, err := io.ReadAll(r.Body)
 		if err != nil {
 			log.Print("error reading request body")
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		r.Body.Close()

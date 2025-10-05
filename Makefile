@@ -43,3 +43,8 @@ pprof_compare:
 
 fmtall:
 	goimports -w ./.
+
+godoc:
+	godoc -http=:6070 -goroot="/home/kan/src/ypMetrics/" -play
+
+#http://localhost:6070/pkg/ypMetrics/internal/?m=all
