@@ -21,7 +21,8 @@ func setupMuxRouter() (*Handler, *mux.Router) {
 		Gauges:   make(map[string]float64),
 		Counters: make(map[string]int64),
 	}
-	handler := NewHandler(mockStorage, zerolog.New(io.Discard))
+	service := NewMetricService(mockStorage, zerolog.New(io.Discard))
+	handler := NewHandler(service, zerolog.New(io.Discard))
 
 	router := mux.NewRouter()
 	router.HandleFunc("/update/{type}/{name}/{value}", handler.updateHandler).Methods(http.MethodPost)
@@ -42,7 +43,6 @@ func ExampleHandler_updateHandler() {
 	router.ServeHTTP(rrGauge, reqGauge)
 
 	fmt.Println(rrGauge.Code)
-	fmt.Println(rrGauge.Body.String())
 
 	// Пример обновления метрики типа counter
 	reqCounter, _ := http.NewRequest(http.MethodPost, "/update/counter/TestCounter/10", nil)
@@ -50,7 +50,6 @@ func ExampleHandler_updateHandler() {
 	router.ServeHTTP(rrCounter, reqCounter)
 
 	fmt.Println(rrCounter.Code)
-	fmt.Println(rrCounter.Body.String())
 
 	// Output:
 	// 200

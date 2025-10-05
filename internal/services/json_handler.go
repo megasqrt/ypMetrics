@@ -24,36 +24,20 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if m.ID == "" || (m.MType != "gauge" && m.MType != "counter") {
-		h.log.Error().Str("type", m.MType).Msg("invalid metric data type")
-		http.Error(w, "invalid metric data", http.StatusBadRequest)
+	updatedMetric, err := h.service.UpdateMetricJSON(m)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest) // Может быть и 500, но сервис вернет ошибку
 		return
 	}
-	h.log.Info().Str("type", m.MType).Str("id", m.ID).Msg("Updating metric")
-	switch m.MType {
-	case "gauge":
-		if m.Value == nil {
-			http.Error(w, "value required for gauge", http.StatusBadRequest)
-			return
-		}
-		h.storage.UpdateGauge(m.ID, *m.Value)
-	case "counter":
-		if m.Delta == nil {
-			http.Error(w, "delta required for counter", http.StatusBadRequest)
-			return
-		}
-		h.storage.UpdateCounter(m.ID, *m.Delta)
-	}
 
-	updatedMetric, err := h.storage.GetJSONMetricsByTypeAndName(m.ID, m.MType)
+	resp, err := json.Marshal(updatedMetric)
 	if err != nil {
-		h.log.Error().Err(err).Msg("could not retrieve updated metric")
-		http.Error(w, "could not retrieve updated metric", http.StatusInternalServerError)
+		http.Error(w, "could not marshal response", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(updatedMetric)
+	w.Write(resp)
 }
 
 // GetMetricJSON возвращает метрику в формате JSON.
@@ -71,7 +55,7 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metricJSON, err := h.storage.GetJSONMetricsByTypeAndName(m.ID, m.MType)
+	metricJSON, err := h.service.GetMetricJSON(m)
 	if err != nil {
 		h.log.Warn().Err(err).Msg("json metric error")
 		helper.JSONErrorWithMesage(w, http.StatusNotFound, "json metric not found")

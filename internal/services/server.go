@@ -12,7 +12,8 @@ import (
 )
 
 func NewMetricServer(cfg misc.Config, s store.Storage, log zerolog.Logger) *http.Server {
-	handlers := NewHandler(s, log)
+	metricService := NewMetricService(s, log)
+	handlers := NewHandler(metricService, log)
 
 	router := mux.NewRouter()
 	HashMiddleware := middlewares.NewHashMiddleware(cfg.HashKey)

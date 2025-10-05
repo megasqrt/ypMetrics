@@ -50,7 +50,7 @@ func TestUpdateHandler(t *testing.T) {
 			mValue: "abc",
 			want: want{
 				statusCode: http.StatusBadRequest,
-				body:       "Invalid gauge value\n",
+				body:       "invalid gauge value: strconv.ParseFloat: parsing \"abc\": invalid syntax\n",
 			},
 		},
 		{
@@ -60,7 +60,7 @@ func TestUpdateHandler(t *testing.T) {
 			mValue: "abc",
 			want: want{
 				statusCode: http.StatusBadRequest,
-				body:       "Invalid counter value\n",
+				body:       "invalid counter value: strconv.ParseInt: parsing \"abc\": invalid syntax\n",
 			},
 		},
 		{
@@ -70,7 +70,7 @@ func TestUpdateHandler(t *testing.T) {
 			mValue: "123",
 			want: want{
 				statusCode: http.StatusBadRequest,
-				body:       "Invalid metric type unknown\n",
+				body:       "invalid metric type unknown\n",
 			},
 		},
 		{
@@ -90,7 +90,8 @@ func TestUpdateHandler(t *testing.T) {
 				Gauges:   make(map[string]float64),
 				Counters: make(map[string]int64),
 			}
-			handler := NewHandler(mockStorage, zerolog.New(io.Discard))
+			service := NewMetricService(mockStorage, zerolog.New(io.Discard))
+			handler := NewHandler(service, zerolog.New(io.Discard))
 			request, _ := http.NewRequest(http.MethodPost, "/update", nil)
 			record := httptest.NewRecorder()
 			vars := map[string]string{
@@ -118,7 +119,8 @@ func TestGetMetricHandler(t *testing.T) {
 	mockStorage.WithGauge("temperature", 36.6).
 		WithCounter("requests", 42)
 
-	handler := NewHandler(mockStorage, zerolog.New(io.Discard))
+	service := NewMetricService(mockStorage, zerolog.New(io.Discard))
+	handler := NewHandler(service, zerolog.New(io.Discard))
 
 	type want struct {
 		statusCode int

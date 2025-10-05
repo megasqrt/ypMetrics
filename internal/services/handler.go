@@ -3,10 +3,7 @@ package services
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"strconv"
-	"ypMetrics/internal/store"
 	"ypMetrics/models"
 
 	"github.com/gorilla/mux"
@@ -14,14 +11,14 @@ import (
 )
 
 type Handler struct {
-	storage store.Storage
+	service *MetricService
 	log     zerolog.Logger
 }
 
 // NewHandler создает новый экземпляр Handler с предоставленным хранилищем.
-func NewHandler(s store.Storage, log zerolog.Logger) Handler {
+func NewHandler(service *MetricService, log zerolog.Logger) Handler {
 	return Handler{
-		storage: s,
+		service: service,
 		log:     log,
 	}
 }
@@ -40,37 +37,18 @@ func (h *Handler) updateHandler(w http.ResponseWriter, r *http.Request) {
 	metricName := vars["name"]
 	metricValue := vars["value"]
 
-	if metricName == "" {
-		http.Error(w, "Invalid URL format", http.StatusNotFound)
+	err := h.service.UpdateMetricFromURL(metricType, metricName, metricValue)
+	if err != nil {
+		// Определяем код ошибки в зависимости от типа
+		if metricName == "" {
+			http.Error(w, "Invalid URL format", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	switch metricType {
-	case models.Gauge:
-		value, err := strconv.ParseFloat(metricValue, 64)
-		if err != nil {
-			http.Error(w, "Invalid gauge value", http.StatusBadRequest)
-			return
-		}
-		h.storage.UpdateGauge(metricName, value)
-		w.WriteHeader(http.StatusOK)
-		// Ответ клиенту не обязателен, но логирование полезно
-		h.log.Info().Str("name", metricName).Float64("value", value).Msg("Gauge updated")
-	case models.Counter:
-		value, err := strconv.ParseInt(metricValue, 10, 64)
-		if err != nil {
-			http.Error(w, "Invalid counter value", http.StatusBadRequest)
-			return
-		}
-		h.storage.UpdateCounter(metricName, value)
-		w.WriteHeader(http.StatusOK)
-		// Ответ клиенту не обязателен
-		h.log.Info().Str("name", metricName).Int64("delta", value).Msg("Counter updated")
-	default:
-		mes := fmt.Sprintf("Invalid metric type %s", metricType)
-		h.log.Error().Msg(mes)
-		http.Error(w, mes, http.StatusBadRequest)
-	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // errorHandler обрабатывает некорректные URL, возвращая ошибку 404 Not Found.
@@ -81,7 +59,7 @@ func (h *Handler) errorHandler(w http.ResponseWriter, r *http.Request) {
 // metricsHandler возвращает все текущие метрики в формате JSON.
 // Используется для отладки и мониторинга.
 func (h *Handler) metricsHandler(w http.ResponseWriter, r *http.Request) {
-	metrics := h.storage.GetAllMetrics()
+	metrics := h.service.GetAllMetrics()
 	jsonData, err := json.MarshalIndent(metrics, "", "  ")
 	if err != nil {
 		http.Error(w, "Failed to serialize metrics", http.StatusInternalServerError)
@@ -96,7 +74,7 @@ func (h *Handler) metricsHandler(w http.ResponseWriter, r *http.Request) {
 // Предназначен для удобного просмотра метрик в браузере.
 func (h *Handler) metricsHTMLHandler(w http.ResponseWriter, r *http.Request) {
 
-	metrics := h.storage.GetAllMetrics()
+	metrics := h.service.GetAllMetrics()
 
 	html := models.HTMLHead
 
@@ -137,11 +115,7 @@ func (h *Handler) metricsHTMLHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 
-	_, err := io.WriteString(w, html)
-	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
+	fmt.Fprint(w, html)
 }
 
 func (h *Handler) getMetricHandler(w http.ResponseWriter, r *http.Request) {
@@ -150,12 +124,12 @@ func (h *Handler) getMetricHandler(w http.ResponseWriter, r *http.Request) {
 	metricType := vars["type"]
 	metricName := vars["name"]
 
-	if metricName == "" || metricType == "" {
+	if metricType == "" || metricName == "" {
 		http.Error(w, "Invalid URL format", http.StatusNotFound)
 		return
 	}
 
-	jsonData, err := h.storage.GetMetricsByTypeAndName(metricName, metricType)
+	jsonData, err := h.service.GetMetricValue(metricType, metricName)
 	if err != nil {
 		h.log.Warn().Err(err).Str("name", metricName).Str("type", metricType).Msg("Metric not found")
 		w.WriteHeader(http.StatusNotFound)
@@ -172,7 +146,7 @@ func (h *Handler) getMetricHandler(w http.ResponseWriter, r *http.Request) {
 // и 500 Internal Server Error в противном случае.
 func (h *Handler) dbPingHandler(w http.ResponseWriter, r *http.Request) {
 
-	if err := h.storage.Ping(r.Context()); err != nil {
+	if err := h.service.Ping(r.Context()); err != nil {
 		h.log.Error().Err(err).Msg("Storage ping failed")
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
@@ -190,7 +164,7 @@ func (h *Handler) UpdateMetricsBatchJSON(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := h.storage.UpdateMetricsBatch(metrics); err != nil {
+	if err := h.service.UpdateMetricsBatch(metrics); err != nil {
 		http.Error(w, "Failed to update metrics batch", http.StatusInternalServerError)
 		return
 	}
