@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 	"ypMetrics/models"
 )
@@ -16,6 +17,7 @@ type MemStorage struct {
 	fileStorage   FileStorer
 	storeInterval time.Duration
 	isSyncMode    bool
+	mu            sync.RWMutex
 }
 
 func NewMemStorage(fs FileStorer, storeInterval time.Duration) *MemStorage {
@@ -29,6 +31,9 @@ func NewMemStorage(fs FileStorer, storeInterval time.Duration) *MemStorage {
 }
 
 func (s *MemStorage) UpdateGauge(name string, value float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.gauges[name] = value
 	if s.isSyncMode {
 		if err := s.SaveToFile(); err != nil {
@@ -38,6 +43,9 @@ func (s *MemStorage) UpdateGauge(name string, value float64) {
 }
 
 func (s *MemStorage) UpdateCounter(name string, value int64) int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.counters[name] += value
 	newValue := s.counters[name]
 	if s.isSyncMode {
@@ -49,6 +57,7 @@ func (s *MemStorage) UpdateCounter(name string, value int64) int64 {
 }
 
 func (s *MemStorage) SaveToFile() error {
+
 	if s.fileStorage != nil {
 		return s.fileStorage.SaveMetrics(s)
 	}
@@ -56,6 +65,9 @@ func (s *MemStorage) SaveToFile() error {
 }
 
 func (s *MemStorage) GetAllMetrics() map[string]interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	metrics := make(map[string]interface{})
 	gauges := make(map[string]float64)
 	counters := make(map[string]int64)
@@ -71,6 +83,9 @@ func (s *MemStorage) GetAllMetrics() map[string]interface{} {
 }
 
 func (s *MemStorage) getMetricValue(mName, mType string) (interface{}, bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	switch mType {
 	case "gauge":
 		value, found := s.gauges[mName]
@@ -163,6 +178,9 @@ func (s *MemStorage) StartPeriodicSave(ctx context.Context) {
 }
 
 func (s *MemStorage) LoadFromFile() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if s.fileStorage != nil {
 		return s.fileStorage.LoadMetrics(s)
 	}
