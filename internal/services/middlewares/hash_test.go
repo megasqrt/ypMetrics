@@ -16,7 +16,7 @@ const testKeyForHash = "my-secret-testing-key"
 func simpleTestHandler(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "can't read body", http.StatusInternalServerError)
+		http.Error(w, "can't read body", http.StatusBadRequest)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
