@@ -30,36 +30,36 @@ func NewMemStorage(fs FileStorer, storeInterval time.Duration) *MemStorage {
 	}
 }
 
-func (s *MemStorage) UpdateGauge(name string, value float64) {
+func (s *MemStorage) UpdateGauge(ctx context.Context, name string, value float64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.gauges[name] = value
 	if s.isSyncMode {
-		if err := s.SaveToFile(); err != nil {
+		if err := s.SaveToFile(ctx); err != nil {
 			log.Printf("Error saving gauge metric synchronously: %v", err)
 		}
 	}
 }
 
-func (s *MemStorage) UpdateCounter(name string, value int64) int64 {
+func (s *MemStorage) UpdateCounter(ctx context.Context, name string, value int64) int64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.counters[name] += value
 	newValue := s.counters[name]
 	if s.isSyncMode {
-		if err := s.SaveToFile(); err != nil {
+		if err := s.SaveToFile(ctx); err != nil {
 			log.Printf("Error saving counter metric synchronously: %v", err)
 		}
 	}
 	return newValue
 }
 
-func (s *MemStorage) SaveToFile() error {
+func (s *MemStorage) SaveToFile(ctx context.Context) error {
 
 	if s.fileStorage != nil {
-		return s.fileStorage.SaveMetrics(s)
+		return s.fileStorage.SaveMetrics(ctx, s)
 	}
 	return nil // No file storage configured
 }
@@ -150,7 +150,7 @@ func (s *MemStorage) GetJSONMetricsByTypeAndName(mName, mType string) ([]byte, e
 // FileStorer определяет интерфейс для сохранения и загрузки метрик из файла.
 type FileStorer interface {
 	// SaveMetrics сохраняет метрики из MemStorage в файл.
-	SaveMetrics(storage *MemStorage) error
+	SaveMetrics(ctx context.Context, storage *MemStorage) error
 	// LoadMetrics загружает метрики из файла в MemStorage.
 	LoadMetrics(storage *MemStorage) error
 }
@@ -166,7 +166,7 @@ func (s *MemStorage) StartPeriodicSave(ctx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := s.fileStorage.SaveMetrics(s); err != nil {
+				if err := s.fileStorage.SaveMetrics(ctx, s); err != nil {
 					log.Printf("Error saving metrics to file: %v", err)
 				}
 			case <-ctx.Done():

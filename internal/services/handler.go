@@ -37,7 +37,7 @@ func (h *Handler) updateHandler(w http.ResponseWriter, r *http.Request) {
 	metricName := vars["name"]
 	metricValue := vars["value"]
 
-	err := h.service.UpdateMetricFromURL(metricType, metricName, metricValue)
+	err := h.service.UpdateMetricFromURL(r.Context(), metricType, metricName, metricValue)
 	if err != nil {
 		// Определяем код ошибки в зависимости от типа
 		if metricName == "" {
@@ -164,7 +164,7 @@ func (h *Handler) UpdateMetricsBatchJSON(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := h.service.UpdateMetricsBatch(metrics); err != nil {
+	if err := h.service.UpdateMetricsBatch(r.Context(), metrics); err != nil {
 		http.Error(w, "Failed to update metrics batch", http.StatusInternalServerError)
 		return
 	}

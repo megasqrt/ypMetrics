@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -92,6 +93,7 @@ func TestUpdateMetricJSON(t *testing.T) {
 
 			req, err := http.NewRequest(http.MethodPost, "/update/", bytes.NewBuffer(body))
 			require.NoError(t, err)
+			req = req.WithContext(context.Background())
 
 			respRecord := httptest.NewRecorder()
 			handler.UpdateMetricJSON(respRecord, req)
@@ -140,6 +142,7 @@ func TestUpdateMetricJSON_InvalidData(t *testing.T) {
 			body, _ := json.Marshal(tt.request)
 			req, err := http.NewRequest(http.MethodPost, "/update/", bytes.NewBuffer(body))
 			require.NoError(t, err)
+			req = req.WithContext(context.Background())
 			resp := httptest.NewRecorder()
 
 			service := NewMetricService(&mocks.MockStorage{}, zerolog.New(io.Discard))

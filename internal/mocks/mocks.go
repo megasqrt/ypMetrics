@@ -14,17 +14,17 @@ import (
 type MockStorage struct {
 	Gauges                          map[string]float64
 	Counters                        map[string]int64
-	UpdateGaugeFunc                 func(name string, value float64)
-	UpdateCounterFunc               func(name string, value int64) int64
+	UpdateGaugeFunc                 func(ctx context.Context, name string, value float64)
+	UpdateCounterFunc               func(ctx context.Context, name string, value int64) int64
 	GetMetricsByTypeAndNameFunc     func(mName, mType string) ([]byte, error)
 	GetJSONMetricsByTypeAndNameFunc func(mName, mType string) ([]byte, error)
 }
 
 var _ store.Storage = (*MockStorage)(nil)
 
-func (m *MockStorage) UpdateGauge(name string, value float64) {
+func (m *MockStorage) UpdateGauge(ctx context.Context, name string, value float64) {
 	if m.UpdateGaugeFunc != nil {
-		m.UpdateGaugeFunc(name, value)
+		m.UpdateGaugeFunc(ctx, name, value)
 		return
 	}
 	if m.Gauges == nil {
@@ -33,9 +33,9 @@ func (m *MockStorage) UpdateGauge(name string, value float64) {
 	m.Gauges[name] = value
 }
 
-func (m *MockStorage) UpdateCounter(name string, value int64) int64 {
+func (m *MockStorage) UpdateCounter(ctx context.Context, name string, value int64) int64 {
 	if m.UpdateCounterFunc != nil {
-		return m.UpdateCounterFunc(name, value)
+		return m.UpdateCounterFunc(ctx, name, value)
 	}
 	if m.Counters == nil {
 		m.Counters = make(map[string]int64)
@@ -136,16 +136,16 @@ func (m *MockStorage) Ping(ctx context.Context) error {
 	return nil
 }
 
-func (m *MockStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
+func (m *MockStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.Metrics) error {
 	for _, metric := range metrics {
 		switch metric.MType {
 		case models.Gauge:
 			if metric.Value != nil {
-				m.UpdateGauge(metric.ID, *metric.Value)
+				m.UpdateGauge(ctx, metric.ID, *metric.Value)
 			}
 		case models.Counter:
 			if metric.Delta != nil {
-				m.UpdateCounter(metric.ID, *metric.Delta)
+				m.UpdateCounter(ctx, metric.ID, *metric.Delta)
 			}
 		}
 	}

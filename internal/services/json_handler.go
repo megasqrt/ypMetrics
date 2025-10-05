@@ -24,7 +24,7 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updatedMetric, err := h.service.UpdateMetricJSON(m)
+	updatedMetric, err := h.service.UpdateMetricJSON(r.Context(), m)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest) // Может быть и 500, но сервис вернет ошибку
 		return

@@ -10,9 +10,9 @@ import (
 // так и персистентные хранилища (например, PostgreSQL).
 type Storage interface {
 	// UpdateGauge обновляет или создает метрику типа gauge.
-	UpdateGauge(name string, value float64)
+	UpdateGauge(ctx context.Context, name string, value float64)
 	// UpdateCounter обновляет или создает метрику типа counter и возвращает ее новое значение.
-	UpdateCounter(name string, value int64) int64
+	UpdateCounter(ctx context.Context, name string, value int64) int64
 	// GetAllMetrics возвращает все метрики из хранилища.
 	GetAllMetrics() map[string]interface{}
 	// GetMetricsByTypeAndName возвращает значение метрики по ее типу и имени в виде среза байт.
@@ -20,7 +20,7 @@ type Storage interface {
 	// GetJSONMetricsByTypeAndName возвращает метрику в виде JSON-объекта models.Metrics.
 	GetJSONMetricsByTypeAndName(mName, mType string) ([]byte, error)
 	// UpdateMetricsBatch выполняет пакетное обновление метрик.
-	UpdateMetricsBatch(metrics []models.Metrics) error
+	UpdateMetricsBatch(ctx context.Context, metrics []models.Metrics) error
 	// Ping проверяет доступность хранилища.
 	Ping(ctx context.Context) error
 }

@@ -26,7 +26,7 @@ func NewMetricService(s store.Storage, log zerolog.Logger) *MetricService {
 }
 
 // UpdateMetricFromURL обновляет метрику на основе данных из URL.
-func (s *MetricService) UpdateMetricFromURL(metricType, metricName, metricValue string) error {
+func (s *MetricService) UpdateMetricFromURL(ctx context.Context, metricType, metricName, metricValue string) error {
 	if metricName == "" {
 		return fmt.Errorf("metric name is required")
 	}
@@ -37,14 +37,14 @@ func (s *MetricService) UpdateMetricFromURL(metricType, metricName, metricValue 
 		if err != nil {
 			return fmt.Errorf("invalid gauge value: %w", err)
 		}
-		s.storage.UpdateGauge(metricName, value)
+		s.storage.UpdateGauge(ctx, metricName, value)
 		s.log.Info().Str("name", metricName).Float64("value", value).Msg("Gauge updated")
 	case models.Counter:
 		value, err := strconv.ParseInt(metricValue, 10, 64)
 		if err != nil {
 			return fmt.Errorf("invalid counter value: %w", err)
 		}
-		s.storage.UpdateCounter(metricName, value)
+		s.storage.UpdateCounter(ctx, metricName, value)
 		s.log.Info().Str("name", metricName).Int64("delta", value).Msg("Counter updated")
 	default:
 		err := fmt.Errorf("invalid metric type %s", metricType)
@@ -55,7 +55,7 @@ func (s *MetricService) UpdateMetricFromURL(metricType, metricName, metricValue 
 }
 
 // UpdateMetricJSON обновляет метрику из JSON-объекта.
-func (s *MetricService) UpdateMetricJSON(m models.Metrics) (models.Metrics, error) {
+func (s *MetricService) UpdateMetricJSON(ctx context.Context, m models.Metrics) (models.Metrics, error) {
 	if m.ID == "" || (m.MType != models.Gauge && m.MType != models.Counter) {
 		s.log.Error().Str("type", m.MType).Msg("invalid metric data type")
 		return models.Metrics{}, fmt.Errorf("invalid metric data")
@@ -68,12 +68,12 @@ func (s *MetricService) UpdateMetricJSON(m models.Metrics) (models.Metrics, erro
 		if m.Value == nil {
 			return models.Metrics{}, fmt.Errorf("value required for gauge")
 		}
-		s.storage.UpdateGauge(m.ID, *m.Value)
+		s.storage.UpdateGauge(ctx, m.ID, *m.Value)
 	case models.Counter:
 		if m.Delta == nil {
 			return models.Metrics{}, fmt.Errorf("delta required for counter")
 		}
-		s.storage.UpdateCounter(m.ID, *m.Delta)
+		s.storage.UpdateCounter(ctx, m.ID, *m.Delta)
 	}
 
 	updatedMetricJSON, err := s.storage.GetJSONMetricsByTypeAndName(m.ID, m.MType)
@@ -107,8 +107,8 @@ func (s *MetricService) GetAllMetrics() map[string]interface{} {
 }
 
 // UpdateMetricsBatch обновляет метрики пакетом.
-func (s *MetricService) UpdateMetricsBatch(metrics []models.Metrics) error {
-	return s.storage.UpdateMetricsBatch(metrics)
+func (s *MetricService) UpdateMetricsBatch(ctx context.Context, metrics []models.Metrics) error {
+	return s.storage.UpdateMetricsBatch(ctx, metrics)
 }
 
 // Ping проверяет доступность хранилища.

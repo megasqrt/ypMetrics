@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -10,8 +11,8 @@ import (
 
 func TestGetMetric(t *testing.T) {
 	storage := NewMemStorage(nil, 0)
-	storage.UpdateGauge("temperature", 36.6)
-	storage.UpdateCounter("requests", 42)
+	storage.UpdateGauge(context.Background(), "temperature", 36.6)
+	storage.UpdateCounter(context.Background(), "requests", 42)
 
 	tests := []struct {
 		name        string
