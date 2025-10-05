@@ -43,26 +43,30 @@ POST http://localhost:8080/update/counter/527
 GET http://localhost:8080/update/undo/tres/527
 
 
+
 ### 
-POST  http://localhost:8080/update/
+POST  http://localhost:8080/value/
+#HashSHA256: dcf537b9e9b674c850fc34bebc775123f5d3d2e78f069d36ac56218ba20c2875
 
 {
-    
-    "id": "RandomValue",
-    "type": "gauge",
-    "value": 234.234
-
+    "id":"PollCount",
+    "type":"counter"
 }
 
 ### 
-POST  http://localhost:8989/value/
+POST  http://localhost:8080/value/
+//HashSHA256: e129199726523d06ef4fd11f740b1102739fcf88a356b62f6072e5194629a3d6
 
-{"id":"PollCount","type":"counter"}
+{
+    "id":"RandomValue", 
+    "type":"gauge"
+}
 
 ### 
-POST  http://localhost:8989/value/
+POST  http://localhost:8080/value/
+//HashSHA256: a118aa2d289c319789ddade48703e22b5986302d50077ec29bf58aca907e84ba
 
-{"method": "gauge", "name": "BuckHashSys", "static": true}
+{"id": "PollCount", "type": "counter"}
 
 
 ### 
@@ -73,3 +77,16 @@ GET http://localhost:8080/value/gauge/testUnknown251
 
 ### ping db
 GET http://localhost:8080/ping
+
+### 
+POST  http://localhost:8080/update/
+HashSHA256: 1f8b08000000000000ff86d7b789c0be1e82055317a290dea5018854377b65c26d54041551a57fdc9a9e
+
+{"id":"PollCount","type":"gauge","value":1}
+
+
+### 
+POST  http://localhost:8080/update/
+HashSHA256: 1f8b08000000000000ff86d7b789c0be1e82055317a290dea5018854377b65c26d54041551a57fdc9a9e
+
+{"id":"NumForcedGC","type":"counter", "delta":3}
