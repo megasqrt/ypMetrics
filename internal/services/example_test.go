@@ -3,11 +3,14 @@ package services
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 
 	"ypMetrics/internal/mocks"
+
+	"github.com/rs/zerolog"
 
 	"github.com/gorilla/mux"
 )
@@ -18,7 +21,7 @@ func setupMuxRouter() (*Handler, *mux.Router) {
 		Gauges:   make(map[string]float64),
 		Counters: make(map[string]int64),
 	}
-	handler := NewHandler(mockStorage)
+	handler := NewHandler(mockStorage, zerolog.New(io.Discard))
 
 	router := mux.NewRouter()
 	router.HandleFunc("/update/{type}/{name}/{value}", handler.updateHandler).Methods(http.MethodPost)
@@ -51,9 +54,7 @@ func ExampleHandler_updateHandler() {
 
 	// Output:
 	// 200
-	// Gauge TestGauge updated to 123.450000
 	// 200
-	// Counter TestCounter incremented by 10, new value: 10
 }
 
 func ExampleHandler_getMetricHandler() {

@@ -1,23 +1,18 @@
 package services
 
 import (
-	"net/http"
-	"os"
-
 	"ypMetrics/internal/misc"
 	"ypMetrics/internal/services/middlewares"
 	"ypMetrics/internal/store"
 
+	"net/http"
+
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
-	zlog "github.com/rs/zerolog/log"
 )
 
-func NewMetricServer(cfg misc.Config, s store.Storage) *http.Server {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	zlog.Logger = zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-
-	handlers := NewHandler(s)
+func NewMetricServer(cfg misc.Config, s store.Storage, log zerolog.Logger) *http.Server {
+	handlers := NewHandler(s, log)
 
 	router := mux.NewRouter()
 	HashMiddleware := middlewares.NewHashMiddleware(cfg.HashKey)

@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"flag"
-	"log"
 	"os/signal"
 	"syscall"
 	"time"
@@ -15,11 +15,9 @@ import (
 	"ypMetrics/internal/services"
 	"ypMetrics/internal/store"
 
-	"github.com/spf13/viper"
-
-	"database/sql"
-
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/rs/zerolog"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -57,6 +55,8 @@ func parseConfig() misc.Config {
 }
 
 func main() {
+	log := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
+
 	cfg := parseConfig()
 
 	// Graceful shutdown
@@ -68,51 +68,52 @@ func main() {
 	var err error
 
 	if cfg.DatabaseDSN != "" {
-		log.Println("Using database storage.")
+		log.Info().Msg("Using database storage.")
+
 		db, err = sql.Open("pgx", cfg.DatabaseDSN)
 		if err != nil {
-			log.Fatalf("Failed to connect to the database: %v", err)
+			log.Fatal().Err(err).Msg("Failed to connect to the database")
 		}
 		defer db.Close()
 
 		if err = db.PingContext(ctx); err != nil && cfg.DatabaseDSN != "" {
-			log.Fatalf("cannot connect to db: %v", err)
+			log.Fatal().Err(err).Msg("cannot connect to db")
 		}
 
 		storage, err = store.NewDBStorage(db)
 		if err != nil {
-			log.Fatalf("Failed to create DB storage: %v", err)
+			log.Fatal().Err(err).Msg("Failed to create DB storage")
 		}
-		log.Println("Successfully create database storage.")
+		log.Info().Msg("Successfully create database storage.")
 	} else {
-		log.Println("Using in-memory storage.")
+		log.Info().Msg("Using in-memory storage.")
 		memStorage, err := store.NewMemStorage(cfg.FileStoragePath, cfg.StoreInterval, cfg.Restore)
 		if err != nil {
-			log.Fatalf("Failed to create memory storage: %v", err)
+			log.Fatal().Err(err).Msg("Failed to create memory storage")
 		}
 		storage = memStorage
 		memStorage.StartPeriodicSave(ctx)
 		defer memStorage.SaveOnExit()
 	}
 
-	server := services.NewMetricServer(cfg, storage)
+	server := services.NewMetricServer(cfg, storage, log)
 
 	go func() {
-		log.Println("Starting pprof server on :6060")
+		log.Info().Msg("Starting pprof server on :6060")
 		if err := http.ListenAndServe(":6060", nil); err != nil {
-			log.Fatalf("pprof server error: %v", err)
+			log.Fatal().Err(err).Msg("pprof server error")
 		}
 	}()
 
 	go func() {
-		log.Printf("Starting server on %s", cfg.ServerAddress)
+		log.Info().Str("address", cfg.ServerAddress).Msg("Starting server")
 		if err := server.ListenAndServe(); err != nil && err != context.Canceled {
-			log.Fatalf("server error: %v", err)
+			log.Fatal().Err(err).Msg("server error")
 		}
 	}()
 
 	<-ctx.Done()
-	log.Println("Shutting down server...")
+	log.Info().Msg("Shutting down server...")
 	server.Shutdown(context.Background())
 
 }

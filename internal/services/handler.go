@@ -10,16 +10,19 @@ import (
 	"ypMetrics/models"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
 )
 
 type Handler struct {
 	storage store.Storage
+	log     zerolog.Logger
 }
 
 // NewHandler создает новый экземпляр Handler с предоставленным хранилищем.
-func NewHandler(s store.Storage) Handler {
+func NewHandler(s store.Storage, log zerolog.Logger) Handler {
 	return Handler{
 		storage: s,
+		log:     log,
 	}
 }
 
@@ -51,18 +54,21 @@ func (h *Handler) updateHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		h.storage.UpdateGauge(metricName, value)
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "Gauge %s updated to %f", metricName, value)
+		// Ответ клиенту не обязателен, но логирование полезно
+		h.log.Info().Str("name", metricName).Float64("value", value).Msg("Gauge updated")
 	case models.Counter:
 		value, err := strconv.ParseInt(metricValue, 10, 64)
 		if err != nil {
 			http.Error(w, "Invalid counter value", http.StatusBadRequest)
 			return
 		}
-		newValue := h.storage.UpdateCounter(metricName, value)
+		h.storage.UpdateCounter(metricName, value)
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "Counter %s incremented by %d, new value: %d", metricName, value, newValue)
+		// Ответ клиенту не обязателен
+		h.log.Info().Str("name", metricName).Int64("delta", value).Msg("Counter updated")
 	default:
 		mes := fmt.Sprintf("Invalid metric type %s", metricType)
+		h.log.Error().Msg(mes)
 		http.Error(w, mes, http.StatusBadRequest)
 	}
 }
@@ -151,8 +157,9 @@ func (h *Handler) getMetricHandler(w http.ResponseWriter, r *http.Request) {
 
 	jsonData, err := h.storage.GetMetricsByTypeAndName(metricName, metricType)
 	if err != nil {
+		h.log.Warn().Err(err).Str("name", metricName).Str("type", metricType).Msg("Metric not found")
 		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(w, "ERROR Handler: %s", err)
+		fmt.Fprintf(w, "Metric '%s' of type '%s' not found", metricName, metricType)
 	} else {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -166,8 +173,8 @@ func (h *Handler) getMetricHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) dbPingHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.storage.Ping(r.Context()); err != nil {
+		h.log.Error().Err(err).Msg("Storage ping failed")
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Storage ping failed: %s", err)
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}

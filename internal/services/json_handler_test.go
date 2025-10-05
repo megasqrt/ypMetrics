@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,6 +14,8 @@ import (
 	"ypMetrics/internal/helper"
 	"ypMetrics/internal/mocks"
 	"ypMetrics/models"
+
+	"github.com/rs/zerolog"
 )
 
 func TestUpdateMetricJSON(t *testing.T) {
@@ -80,7 +83,8 @@ func TestUpdateMetricJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := NewHandler(tt.initialStorage)
+			// Создаем логгер, который ничего не выводит, для чистоты тестов
+			handler := NewHandler(tt.initialStorage, zerolog.New(io.Discard))
 
 			body, err := json.Marshal(tt.requestMetric)
 			require.NoError(t, err)
@@ -137,7 +141,7 @@ func TestUpdateMetricJSON_InvalidData(t *testing.T) {
 			require.NoError(t, err)
 			resp := httptest.NewRecorder()
 
-			handler := NewHandler(&mocks.MockStorage{})
+			handler := NewHandler(&mocks.MockStorage{}, zerolog.New(io.Discard))
 			handler.UpdateMetricJSON(resp, req)
 
 			assert.Equal(t, tt.expected, resp.Code)
@@ -195,7 +199,7 @@ func TestGetMetricJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := NewHandler(storage)
+			handler := NewHandler(storage, zerolog.New(io.Discard))
 			body, err := json.Marshal(tt.requestMetric)
 			require.NoError(t, err)
 			req, err := http.NewRequest(http.MethodPost, "/value/", bytes.NewBuffer(body))
