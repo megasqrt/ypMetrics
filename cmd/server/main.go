@@ -8,20 +8,19 @@ import (
 	"syscall"
 	"time"
 
-	"ypMetrics/internal/helper"
-	"ypMetrics/internal/services"
-	"ypMetrics/internal/store"
-	"ypMetrics/internal/misc"
 	"net/http"
 	_ "net/http/pprof"
-
+	"ypMetrics/internal/helper"
+	"ypMetrics/internal/misc"
+	"ypMetrics/internal/services"
+	"ypMetrics/internal/store"
 
 	"github.com/spf13/viper"
 
 	"database/sql"
-    _ "github.com/jackc/pgx/v5/stdlib"
-)
 
+	_ "github.com/jackc/pgx/v5/stdlib"
+)
 
 const (
 	defaultServerAddress   = "localhost:8080"
@@ -29,7 +28,7 @@ const (
 	defaultFileStoragePath = "/tmp/metrics-db.json"
 	defaultRestore         = true
 	defaultDatabaseDSN     = ""
-	defaultHashKey		   = ""
+	defaultHashKey         = ""
 )
 
 func parseConfig() misc.Config {

@@ -20,10 +20,10 @@ func TestHTTPReporter_Report(t *testing.T) {
 		{ID: "TestGauge", MType: "gauge", Value: helper.Ptr(3.14)},
 		{ID: "TestCounter", MType: "counter", Delta: helper.Ptr(int64(42))},
 	}
-	
+
 	var singleCalled, batchCalled, pingCalled int
 	var mu sync.Mutex
-	
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -79,7 +79,7 @@ func TestHTTPReporter_Report(t *testing.T) {
 		assert.Equal(t, 0, singleCalled, "sendSingle should not be called")
 		assert.Equal(t, 1, batchCalled, "sendBatch should be called once")
 	})
-t.Run("report fails if ping fails", func(t *testing.T) {
+	t.Run("report fails if ping fails", func(t *testing.T) {
 		// Создаем сервер, который всегда проваливает ping
 		failingServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/ping" {

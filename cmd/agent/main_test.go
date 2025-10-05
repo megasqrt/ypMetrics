@@ -8,9 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"ypMetrics/internal/agent"
 	"ypMetrics/models"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var _ agent.Collector = (*mockCollector)(nil)
@@ -53,7 +54,7 @@ func (m *mockReporter) Report(metrics []models.Metrics) error {
 
 func TestNewMetricsAgent(t *testing.T) {
 	var collector agent.Collector = agent.NewMetricCollector()
-	reporter := agent.NewHTTPReporter("localhost:8080","")
+	reporter := agent.NewHTTPReporter("localhost:8080", "")
 	pollInterval := 2 * time.Second
 	reportInterval := 10 * time.Second
 	rateLimit := 1
@@ -99,30 +100,30 @@ func TestParseConfig(t *testing.T) {
 	defer func() { os.Args = oldArgs }()
 
 	tests := []struct {
-		name           string
-		args           []string
-		env            map[string]string
-		expectedAddr   string
-		expectedReport time.Duration
-		expectedPoll   time.Duration
+		name              string
+		args              []string
+		env               map[string]string
+		expectedAddr      string
+		expectedReport    time.Duration
+		expectedPoll      time.Duration
 		expectedRateLimit int
 	}{
 		{
-			name:           "default values",
-			args:           []string{"cmd"},
-			env:            nil,
-			expectedAddr:   "localhost:8080",
-			expectedReport: 10 * time.Second,
-			expectedPoll:   2 * time.Second,
+			name:              "default values",
+			args:              []string{"cmd"},
+			env:               nil,
+			expectedAddr:      "localhost:8080",
+			expectedReport:    10 * time.Second,
+			expectedPoll:      2 * time.Second,
 			expectedRateLimit: 1,
 		},
 		{
-			name:           "custom flag values",
-			args:           []string{"cmd", "-a=127.0.0.1:9090", "-r=5", "-p=1", "-l=3"},
-			env:            nil,
-			expectedAddr:   "127.0.0.1:9090",
-			expectedReport: 5 * time.Second,
-			expectedPoll:   1 * time.Second,
+			name:              "custom flag values",
+			args:              []string{"cmd", "-a=127.0.0.1:9090", "-r=5", "-p=1", "-l=3"},
+			env:               nil,
+			expectedAddr:      "127.0.0.1:9090",
+			expectedReport:    5 * time.Second,
+			expectedPoll:      1 * time.Second,
 			expectedRateLimit: 3,
 		},
 		{
@@ -134,9 +135,9 @@ func TestParseConfig(t *testing.T) {
 				"POLL_INTERVAL":   "3",
 				"RATE_LIMIT":      "5",
 			},
-			expectedAddr:   "env.host:1234",
-			expectedReport: 15 * time.Second,
-			expectedPoll:   3 * time.Second,
+			expectedAddr:      "env.host:1234",
+			expectedReport:    15 * time.Second,
+			expectedPoll:      3 * time.Second,
 			expectedRateLimit: 5,
 		},
 		{
@@ -145,9 +146,9 @@ func TestParseConfig(t *testing.T) {
 			env: map[string]string{
 				"ADDRESS": "env.host:1234",
 			},
-			expectedAddr:   "flag.host:5678",
-			expectedReport: 10 * time.Second,
-			expectedPoll:   2 * time.Second,
+			expectedAddr:      "flag.host:5678",
+			expectedReport:    10 * time.Second,
+			expectedPoll:      2 * time.Second,
 			expectedRateLimit: 1,
 		},
 	}

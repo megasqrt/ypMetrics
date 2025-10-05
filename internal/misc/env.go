@@ -9,6 +9,6 @@ type Config struct {
 	StoreInterval   time.Duration
 	FileStoragePath string
 	Restore         bool
-	DatabaseDSN     string	
-	HashKey        string
+	DatabaseDSN     string
+	HashKey         string
 }

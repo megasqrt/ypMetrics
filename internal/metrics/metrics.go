@@ -1,9 +1,9 @@
 package metrics
 
 import (
-	"errors"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -11,11 +11,11 @@ import (
 )
 
 type MemStorage struct {
-	gauges         map[string]float64
-	counters       map[string]int64
-	fileStorage    FileStorer
-	storeInterval  time.Duration
-	isSyncMode     bool
+	gauges        map[string]float64
+	counters      map[string]int64
+	fileStorage   FileStorer
+	storeInterval time.Duration
+	isSyncMode    bool
 }
 
 func NewMemStorage(fs FileStorer, storeInterval time.Duration) *MemStorage {
