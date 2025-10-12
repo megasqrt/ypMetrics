@@ -20,12 +20,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	buildVersion string
-	buildDate    string
-	buildCommit  string
-)
-
 const (
 	defaultServerAddress   = "localhost:8080"
 	defaultStoreInterval   = 300
@@ -61,21 +55,11 @@ func parseConfig() misc.Config {
 }
 
 func main() {
-	if buildVersion == "" {
-		buildVersion = "N/A"
-	}
-	if buildDate == "" {
-		buildDate = "N/A"
-	}
-	if buildCommit == "" {
-		buildCommit = "N/A"
-	}
-	
 	log := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
 
-	cfg := parseConfig()
+	helper.BuildInfoPrint()
 
-	log.Printf("Build version: %s\nBuild date: %s\nBuild commit: %s\n", buildVersion, buildDate, buildCommit)
+	cfg := parseConfig()
 
 	// Graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

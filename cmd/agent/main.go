@@ -123,12 +123,6 @@ func (a *MetricsAgent) Run(ctx context.Context) {
 }
 
 var (
-	buildVersion string
-	buildDate    string
-	buildCommit  string
-)
-
-var (
 	serverAddress  string
 	reportInterval int
 	pollInterval   int
@@ -189,16 +183,7 @@ func parseConfig() config {
 }
 
 func main() {
-	if buildVersion == "" {
-		buildVersion = "N/A"
-	}
-	if buildDate == "" {
-		buildDate = "N/A"
-	}
-	if buildCommit == "" {
-		buildCommit = "N/A"
-	}
-	log.Printf("Build version: %s\nBuild date: %s\nBuild commit: %s\n", buildVersion, buildDate, buildCommit)
+	helper.BuildInfoPrint()
 	cfg := parseConfig()
 	ctx, cancel := context.WithCancel(context.Background())
 
