@@ -12,4 +12,5 @@ type Config struct {
 	DatabaseDSN     string
 	HashKey         string
 	CryptoKey       string
+	ConfigPath      string
 }
