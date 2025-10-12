@@ -3,7 +3,11 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -29,15 +33,17 @@ type HTTPReporter struct {
 	hashKey       string
 	mu            sync.Mutex
 	nextBatch     bool
+	cryptoKey     string
 }
 
-func NewHTTPReporter(serverAddress string, hashKey string) *HTTPReporter {
+func NewHTTPReporter(serverAddress string, hashKey string, cryptoKey string) *HTTPReporter {
 	return &HTTPReporter{
 		serverAddress: serverAddress,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		hashKey: hashKey,
+		hashKey:   hashKey,
+		cryptoKey: cryptoKey,
 	}
 }
 
@@ -108,6 +114,30 @@ func (r *HTTPReporter) sendGzippedJSON(url string, data interface{}) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("ошибка маршалинга данных: %w", err)
+	}
+
+	if r.cryptoKey != "" {
+		keyBytes, err := os.ReadFile(r.cryptoKey)
+		if err != nil {
+			return fmt.Errorf("ошибка чтения публичного ключа: %w", err)
+		}
+		block, _ := pem.Decode(keyBytes)
+		if block == nil {
+			return errors.New("не удалось декодировать публичный ключ")
+		}
+		pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			return fmt.Errorf("ошибка парсинга публичного ключа: %w", err)
+		}
+		pubKey, ok := pub.(*rsa.PublicKey)
+		if !ok {
+			return errors.New("неверный тип публичного ключа")
+		}
+		encryptedData, err := rsa.EncryptPKCS1v15(rand.Reader, pubKey, jsonData)
+		if err != nil {
+			return fmt.Errorf("ошибка шифрования данных: %w", err)
+		}
+		jsonData = encryptedData
 	}
 
 	var buf bytes.Buffer

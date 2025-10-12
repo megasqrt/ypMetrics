@@ -27,6 +27,7 @@ const (
 	defaultRestore         = true
 	defaultDatabaseDSN     = ""
 	defaultHashKey         = ""
+	defaultCryptoKey       = ""
 )
 
 func parseConfig() misc.Config {
@@ -39,6 +40,7 @@ func parseConfig() misc.Config {
 	flag.BoolVar(&cfg.Restore, "r", defaultRestore, "restore from file on start")
 	flag.StringVar(&cfg.DatabaseDSN, "d", defaultDatabaseDSN, "database DSN")
 	flag.StringVar(&cfg.HashKey, "k", defaultHashKey, "key for hashing")
+	flag.StringVar(&cfg.CryptoKey, "crypto-key", defaultCryptoKey, "path to private key file")
 	flag.Parse()
 
 	viper.AutomaticEnv()
@@ -48,6 +50,7 @@ func parseConfig() misc.Config {
 	helper.AssignFromViperIfSet(&cfg.Restore, "RESTORE", viper.GetBool, defaultRestore)
 	helper.AssignFromViperIfSet(&cfg.DatabaseDSN, "DATABASE_DSN", viper.GetString, defaultDatabaseDSN)
 	helper.AssignFromViperIfSet(&cfg.HashKey, "KEY", viper.GetString, defaultHashKey)
+	helper.AssignFromViperIfSet(&cfg.CryptoKey, "CRYPTO_KEY", viper.GetString, defaultCryptoKey)
 
 	cfg.StoreInterval = time.Duration(storeInterval) * time.Second
 

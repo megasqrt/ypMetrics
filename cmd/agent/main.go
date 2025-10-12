@@ -128,6 +128,7 @@ var (
 	pollInterval   int
 	hashKey        string
 	rateLimit      int
+	cryptoKey      string
 )
 
 type config struct {
@@ -136,6 +137,7 @@ type config struct {
 	reportInterval time.Duration
 	hashKey        string
 	rateLimit      int
+	cryptoKey      string
 }
 
 const (
@@ -144,6 +146,7 @@ const (
 	defaultPollInterval   = 2
 	defaultHashKey        = ""
 	defaultRateLimit      = 1
+	defaultCryptoKey      = ""
 )
 
 func registerFlags() {
@@ -152,6 +155,7 @@ func registerFlags() {
 	flag.IntVar(&pollInterval, "p", defaultPollInterval, "poll interval")
 	flag.StringVar(&hashKey, "k", defaultHashKey, "key for hashing")
 	flag.IntVar(&rateLimit, "l", defaultRateLimit, "rate limit for concurrent requests")
+	flag.StringVar(&cryptoKey, "crypto-key", defaultCryptoKey, "path to public key file")
 }
 
 func init() {
@@ -168,6 +172,7 @@ func parseConfig() config {
 	helper.AssignFromViperIfSet(&pollInterval, "POLL_INTERVAL", viper.GetInt, defaultPollInterval)
 	helper.AssignFromViperIfSet(&hashKey, "KEY", viper.GetString, defaultHashKey)
 	helper.AssignFromViperIfSet(&rateLimit, "RATE_LIMIT", viper.GetInt, defaultRateLimit)
+	helper.AssignFromViperIfSet(&cryptoKey, "CRYPTO_KEY", viper.GetString, defaultCryptoKey)
 
 	if !govalidator.IsURL(serverAddress) {
 		log.Fatalf("некорректный URL сервера: %s", serverAddress)
@@ -179,6 +184,7 @@ func parseConfig() config {
 		pollInterval:   time.Duration(pollInterval) * time.Second,
 		hashKey:        hashKey,
 		rateLimit:      rateLimit,
+		cryptoKey:      cryptoKey,
 	}
 }
 
@@ -197,7 +203,7 @@ func main() {
 
 	// Создание компонентов
 	collector := agent.NewMetricCollector()
-	reporter := agent.NewHTTPReporter(cfg.serverAddress, cfg.hashKey)
+	reporter := agent.NewHTTPReporter(cfg.serverAddress, cfg.hashKey, cfg.cryptoKey)
 
 	// Создание и запуск агента
 	metricsAgent := NewMetricsAgent(

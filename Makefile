@@ -19,10 +19,13 @@ run_a:
 
 tests: vet
 	go test ./...
-	go test -v -race ./...
+
 
 vet:
 	go vet -vettool=$(go run tools/staticlint/main.go) ./...
+
+race:
+	go test -v -race ./...
 
 build:
 	go build -o server cmd/server/main.go

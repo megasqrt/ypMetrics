@@ -54,7 +54,7 @@ func TestHTTPReporter_Report(t *testing.T) {
 	}))
 	defer server.Close()
 
-	reporter := NewHTTPReporter(server.Listener.Addr().String(), "")
+	reporter := NewHTTPReporter(server.Listener.Addr().String(), "", "")
 	t.Run("first report sends single", func(t *testing.T) {
 		err := reporter.Report(metricsToSend)
 		require.NoError(t, err)
@@ -88,7 +88,7 @@ func TestHTTPReporter_Report(t *testing.T) {
 		}))
 		defer failingServer.Close()
 
-		failingReporter := NewHTTPReporter(failingServer.Listener.Addr().String(), "")
+		failingReporter := NewHTTPReporter(failingServer.Listener.Addr().String(), "", "")
 		err := failingReporter.Report(metricsToSend)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "report failed")
