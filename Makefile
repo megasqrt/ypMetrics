@@ -17,10 +17,12 @@ run_s:
 run_a:
 	KEY=$(KEY) go run cmd/agent/main.go
 
-tests:
-	go vet -vettool=$(which statictest) ./...
+tests: vet
 	go test ./...
 	go test -v -race ./...
+
+vet:
+	go vet -vettool=$(go run tools/staticlint/main.go) ./...
 
 build:
 	go build -o server cmd/server/main.go

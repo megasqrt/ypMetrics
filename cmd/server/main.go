@@ -57,6 +57,8 @@ func parseConfig() misc.Config {
 func main() {
 	log := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
 
+	helper.BuildInfoPrint()
+
 	cfg := parseConfig()
 
 	// Graceful shutdown

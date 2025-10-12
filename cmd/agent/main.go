@@ -183,6 +183,7 @@ func parseConfig() config {
 }
 
 func main() {
+	helper.BuildInfoPrint()
 	cfg := parseConfig()
 	ctx, cancel := context.WithCancel(context.Background())
 

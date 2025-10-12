@@ -4,22 +4,24 @@ import (
 	"go/ast"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/inspect"
 )
 
 // NoOSExitAnalyzer — это анализатор, который проверяет прямые вызовы os.Exit в функции main пакета main.
 var NoOSExitAnalyzer = &analysis.Analyzer{
-	Name: "noosexit",
-	Doc:  "проверяет прямые вызовы os.Exit в main",
-	Run:  run,
+	Name:     "noosexit",
+	Doc:      "проверяет прямые вызовы os.Exit в main",
+	Requires: []*analysis.Analyzer{inspect.Analyzer},
+	Run:      run,
 }
 
 func run(pass *analysis.Pass) (interface{}, error) {
-	for _, file := range pass.Files {
-		// Нас интересует только пакет main.
-		if pass.Pkg.Name() != "main" {
-			continue
-		}
+	// Нас интересует только пакет main.
+	if pass.Pkg.Name() != "main" {
+		return nil, nil
+	}
 
+	for _, file := range pass.Files {
 		ast.Inspect(file, func(node ast.Node) bool {
 			// Ищем объявление функции.
 			if fn, ok := node.(*ast.FuncDecl); ok && fn.Name.Name == "main" {
@@ -29,9 +31,14 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					if call, ok := n.(*ast.CallExpr); ok {
 						// Проверяем, является ли вызов функции выражением-селектором (например, os.Exit).
 						if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
-							// Проверяем, является ли объект селектора идентификатором с именем "os".
-							if ident, ok := sel.X.(*ast.Ident); ok && ident.Name == "os" && sel.Sel.Name == "Exit" {
-								pass.Reportf(call.Pos(), "прямой вызов os.Exit в функции main запрещен")
+							// Используем информацию о типах для определения объекта, к которому относится селектор.
+							if ident, ok := sel.X.(*ast.Ident); ok {
+								if obj := pass.TypesInfo.ObjectOf(ident); obj != nil && obj.Pkg() != nil {
+									// Проверяем, что пакет - это "os", а функция - "Exit".
+									if obj.Pkg().Path() == "os" && sel.Sel.Name == "Exit" {
+										pass.Reportf(call.Pos(), "прямой вызов os.Exit в функции main запрещен")
+									}
+								}
 							}
 						}
 					}
