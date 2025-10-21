@@ -222,7 +222,10 @@ func main() {
 
 	// Создание компонентов
 	collector := agent.NewMetricCollector()
-	reporter := agent.NewHTTPReporter(cfg.serverAddress, cfg.hashKey, cfg.cryptoKey)
+	reporter, err := agent.NewHTTPReporter(cfg.serverAddress, cfg.hashKey, cfg.cryptoKey)
+	if err != nil {
+		log.Fatalf("Ошибка создания репортера: %v", err)
+	}
 
 	// Создание и запуск агента
 	metricsAgent := NewMetricsAgent(
