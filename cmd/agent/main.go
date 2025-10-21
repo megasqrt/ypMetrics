@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"log"
-	"os"
 	"os/signal"
 	"sync"
 	"syscall"
@@ -210,15 +209,6 @@ func parseConfig() config {
 func main() {
 	helper.BuildInfoPrint()
 	cfg := parseConfig()
-	ctx, cancel := context.WithCancel(context.Background())
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	go func() {
-		sig := <-sigChan
-		log.Printf("Получен сигнал: %v. Завершение работы...", sig)
-		cancel()
-	}()
 
 	// Создание компонентов
 	collector := agent.NewMetricCollector()
@@ -226,6 +216,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Ошибка создания репортера: %v", err)
 	}
+
+	// Graceful shutdown
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
+
+	go func() {
+		<-ctx.Done()
+		log.Println("Получен сигнал завершения. Завершение работы...")
+	}()
 
 	// Создание и запуск агента
 	metricsAgent := NewMetricsAgent(
