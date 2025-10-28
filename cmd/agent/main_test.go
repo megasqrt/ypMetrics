@@ -54,7 +54,8 @@ func (m *mockReporter) Report(metrics []models.Metrics) error {
 
 func TestNewMetricsAgent(t *testing.T) {
 	var collector agent.Collector = agent.NewMetricCollector()
-	reporter := agent.NewHTTPReporter("localhost:8080", "", "")
+	reporter, err := agent.NewHTTPReporter("localhost:8080", "", "")
+	assert.NoError(t, err)
 	pollInterval := 2 * time.Second
 	reportInterval := 10 * time.Second
 	rateLimit := 1

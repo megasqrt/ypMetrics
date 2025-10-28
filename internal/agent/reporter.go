@@ -33,18 +33,39 @@ type HTTPReporter struct {
 	hashKey       string
 	mu            sync.Mutex
 	nextBatch     bool
-	cryptoKey     string
+	publicKey     *rsa.PublicKey
 }
 
-func NewHTTPReporter(serverAddress string, hashKey string, cryptoKey string) *HTTPReporter {
+func NewHTTPReporter(serverAddress string, hashKey string, cryptoKeyPath string) (*HTTPReporter, error) {
+	var publicKey *rsa.PublicKey
+	if cryptoKeyPath != "" {
+		keyBytes, err := os.ReadFile(cryptoKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("ошибка чтения публичного ключа: %w", err)
+		}
+		block, _ := pem.Decode(keyBytes)
+		if block == nil {
+			return nil, errors.New("не удалось декодировать публичный ключ")
+		}
+		pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("ошибка парсинга публичного ключа: %w", err)
+		}
+		var ok bool
+		publicKey, ok = pub.(*rsa.PublicKey)
+		if !ok {
+			return nil, errors.New("неверный тип публичного ключа")
+		}
+	}
+
 	return &HTTPReporter{
 		serverAddress: serverAddress,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
 		hashKey:   hashKey,
-		cryptoKey: cryptoKey,
-	}
+		publicKey: publicKey,
+	}, nil
 }
 
 func (r *HTTPReporter) Report(metrics []models.Metrics) error {
@@ -116,24 +137,8 @@ func (r *HTTPReporter) sendGzippedJSON(url string, data interface{}) error {
 		return fmt.Errorf("ошибка маршалинга данных: %w", err)
 	}
 
-	if r.cryptoKey != "" {
-		keyBytes, err := os.ReadFile(r.cryptoKey)
-		if err != nil {
-			return fmt.Errorf("ошибка чтения публичного ключа: %w", err)
-		}
-		block, _ := pem.Decode(keyBytes)
-		if block == nil {
-			return errors.New("не удалось декодировать публичный ключ")
-		}
-		pub, err := x509.ParsePKIXPublicKey(block.Bytes)
-		if err != nil {
-			return fmt.Errorf("ошибка парсинга публичного ключа: %w", err)
-		}
-		pubKey, ok := pub.(*rsa.PublicKey)
-		if !ok {
-			return errors.New("неверный тип публичного ключа")
-		}
-		encryptedData, err := rsa.EncryptPKCS1v15(rand.Reader, pubKey, jsonData)
+	if r.publicKey != nil {
+		encryptedData, err := rsa.EncryptPKCS1v15(rand.Reader, r.publicKey, jsonData)
 		if err != nil {
 			return fmt.Errorf("ошибка шифрования данных: %w", err)
 		}
