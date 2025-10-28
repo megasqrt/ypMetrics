@@ -28,9 +28,10 @@ const (
 	defaultDatabaseDSN     = ""
 	defaultHashKey         = ""
 	defaultCryptoKey       = ""
+	defaultConfigPath      = ""
 )
 
-func parseConfig() misc.Config {
+func parseConfig(log zerolog.Logger) misc.Config {
 	var cfg misc.Config
 	var storeInterval int
 
@@ -41,9 +42,26 @@ func parseConfig() misc.Config {
 	flag.StringVar(&cfg.DatabaseDSN, "d", defaultDatabaseDSN, "database DSN")
 	flag.StringVar(&cfg.HashKey, "k", defaultHashKey, "key for hashing")
 	flag.StringVar(&cfg.CryptoKey, "crypto-key", defaultCryptoKey, "path to private key file")
+	flag.StringVar(&cfg.ConfigPath, "c", defaultConfigPath, "path to config file")
 	flag.Parse()
 
+	// Сначала читаем конфиг из файла, если он указан
+	configPathFromEnv := viper.Get("CONFIG")
+	if cfg.ConfigPath != "" {
+		viper.SetConfigFile(cfg.ConfigPath)
+	} else if configPathFromEnv != nil {
+		viper.SetConfigFile(configPathFromEnv.(string))
+	}
+
+	if viper.ConfigFileUsed() != "" {
+		if err := viper.ReadInConfig(); err != nil {
+			// Логируем ошибку, но не падаем, т.к. конфиг не обязателен
+			log.Error().Err(err).Msg("Error reading config file")
+		}
+	}
+
 	viper.AutomaticEnv()
+
 	helper.AssignFromViperIfSet(&cfg.ServerAddress, "ADDRESS", viper.GetString, defaultServerAddress)
 	helper.AssignFromViperIfSet(&storeInterval, "STORE_INTERVAL", viper.GetInt, defaultStoreInterval)
 	helper.AssignFromViperIfSet(&cfg.FileStoragePath, "FILE_STORAGE_PATH", viper.GetString, defaultFileStoragePath)
@@ -51,6 +69,7 @@ func parseConfig() misc.Config {
 	helper.AssignFromViperIfSet(&cfg.DatabaseDSN, "DATABASE_DSN", viper.GetString, defaultDatabaseDSN)
 	helper.AssignFromViperIfSet(&cfg.HashKey, "KEY", viper.GetString, defaultHashKey)
 	helper.AssignFromViperIfSet(&cfg.CryptoKey, "CRYPTO_KEY", viper.GetString, defaultCryptoKey)
+	helper.AssignFromViperIfSet(&cfg.ConfigPath, "CONFIG", viper.GetString, defaultConfigPath)
 
 	cfg.StoreInterval = time.Duration(storeInterval) * time.Second
 
@@ -62,7 +81,7 @@ func main() {
 
 	helper.BuildInfoPrint()
 
-	cfg := parseConfig()
+	cfg := parseConfig(log)
 
 	// Graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

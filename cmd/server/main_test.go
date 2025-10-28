@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -47,8 +48,8 @@ func TestParseConfig(t *testing.T) {
 			expectedKey:      "test-key",
 		},
 		{
-			name:             "env values",
-			args:             []string{"cmd"},
+			name: "env values",
+			args: []string{"cmd"},
 			env: map[string]string{
 				"ADDRESS":           "localhost:7070",
 				"STORE_INTERVAL":    "25",
@@ -65,8 +66,8 @@ func TestParseConfig(t *testing.T) {
 			expectedKey:      "env-key",
 		},
 		{
-			name:             "flags_override_env",
-			args:             []string{"cmd", "-a", "localhost:9999", "-k", "flag-key"},
+			name: "flags_override_env",
+			args: []string{"cmd", "-a", "localhost:9999", "-k", "flag-key"},
 			env: map[string]string{
 				"ADDRESS": "localhost:7777", // This will be ignored
 				"KEY":     "env-key",        // This will be ignored
@@ -91,8 +92,9 @@ func TestParseConfig(t *testing.T) {
 				t.Setenv(k, v)
 			}
 
+			log := zerolog.Nop()
 			// Call the function to be tested
-			cfg := parseConfig()
+			cfg := parseConfig(log)
 
 			// Assertions
 			assert.Equal(t, tc.expectedAddress, cfg.ServerAddress)

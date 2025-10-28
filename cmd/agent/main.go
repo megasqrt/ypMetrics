@@ -129,6 +129,7 @@ var (
 	hashKey        string
 	rateLimit      int
 	cryptoKey      string
+	configPath     string
 )
 
 type config struct {
@@ -138,6 +139,7 @@ type config struct {
 	hashKey        string
 	rateLimit      int
 	cryptoKey      string
+	configPath     string
 }
 
 const (
@@ -147,6 +149,7 @@ const (
 	defaultHashKey        = ""
 	defaultRateLimit      = 1
 	defaultCryptoKey      = ""
+	defaultConfigPath     = ""
 )
 
 func registerFlags() {
@@ -156,6 +159,7 @@ func registerFlags() {
 	flag.StringVar(&hashKey, "k", defaultHashKey, "key for hashing")
 	flag.IntVar(&rateLimit, "l", defaultRateLimit, "rate limit for concurrent requests")
 	flag.StringVar(&cryptoKey, "crypto-key", defaultCryptoKey, "path to public key file")
+	flag.StringVar(&configPath, "c", defaultConfigPath, "path to config file")
 }
 
 func init() {
@@ -165,6 +169,19 @@ func init() {
 func parseConfig() config {
 	flag.Parse()
 
+	configPathFromEnv := viper.Get("CONFIG")
+	if configPath != "" {
+		viper.SetConfigFile(configPath)
+	} else if configPathFromEnv != nil {
+		viper.SetConfigFile(configPathFromEnv.(string))
+	}
+
+	if viper.ConfigFileUsed() != "" {
+		if err := viper.ReadInConfig(); err != nil {
+			log.Printf("Error reading config file: %v", err)
+		}
+	}
+
 	viper.AutomaticEnv()
 
 	helper.AssignFromViperIfSet(&serverAddress, "ADDRESS", viper.GetString, defaultServerAddress)
@@ -173,6 +190,7 @@ func parseConfig() config {
 	helper.AssignFromViperIfSet(&hashKey, "KEY", viper.GetString, defaultHashKey)
 	helper.AssignFromViperIfSet(&rateLimit, "RATE_LIMIT", viper.GetInt, defaultRateLimit)
 	helper.AssignFromViperIfSet(&cryptoKey, "CRYPTO_KEY", viper.GetString, defaultCryptoKey)
+	helper.AssignFromViperIfSet(&configPath, "CONFIG", viper.GetString, defaultConfigPath)
 
 	if !govalidator.IsURL(serverAddress) {
 		log.Fatalf("некорректный URL сервера: %s", serverAddress)
@@ -185,6 +203,7 @@ func parseConfig() config {
 		hashKey:        hashKey,
 		rateLimit:      rateLimit,
 		cryptoKey:      cryptoKey,
+		configPath:     configPath,
 	}
 }
 
