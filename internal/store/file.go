@@ -4,18 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"ypMetrics/internal/metrics"
 )
 
 type FileStorage struct {
 	filePath string
 }
 
-func NewFileStorage(filePath string) *FileStorage {
+func NewFileStorage(filePath string) *FileStorage { 
 	return &FileStorage{filePath: filePath}
 }
 
-func (fs *FileStorage) SaveMetrics(ctx context.Context, storage *metrics.MemStorage) error {
+func (fs *FileStorage) SaveMetrics(ctx context.Context, storage *MemStorage) error {
 	data, err := json.Marshal(storage.GetAllMetrics())
 	if err != nil {
 		return err
@@ -24,7 +23,7 @@ func (fs *FileStorage) SaveMetrics(ctx context.Context, storage *metrics.MemStor
 	return os.WriteFile(fs.filePath, data, 0666)
 }
 
-func (fs *FileStorage) LoadMetrics(storage *metrics.MemStorage) error {
+func (fs *FileStorage) LoadMetrics(storage *MemStorage) error {
 	data, err := os.ReadFile(fs.filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -46,11 +45,11 @@ func (fs *FileStorage) LoadMetrics(storage *metrics.MemStorage) error {
 		return err
 	}
 
-	for name, value := range allMetrics.Gauges {
-		storage.UpdateGauge(context.Background(), name, value)
+	if allMetrics.Gauges != nil {
+		storage.gauges = allMetrics.Gauges
 	}
-	for name, value := range allMetrics.Counters {
-		storage.UpdateCounter(context.Background(), name, value)
+	if allMetrics.Counters != nil {
+		storage.counters = allMetrics.Counters
 	}
 
 	return nil

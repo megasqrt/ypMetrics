@@ -17,7 +17,11 @@ func NewMetricServer(cfg misc.Config, s store.Storage, log zerolog.Logger) *http
 
 	router := mux.NewRouter()
 	HashMiddleware := middlewares.NewHashMiddleware(cfg.HashKey)
-	router.Use(middlewares.LoggingMiddleware, HashMiddleware.HashMiddleware, middlewares.GzipMiddleware)
+	CryptoMiddleware, err := middlewares.NewCryptoMiddleware(cfg.CryptoKey)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to create crypto middleware")
+	}
+	router.Use(middlewares.GzipMiddleware, CryptoMiddleware.CryptoMiddleware, HashMiddleware.HashMiddleware, middlewares.LoggingMiddleware)
 
 	router.HandleFunc("/update/", handlers.UpdateMetricJSON).Methods(http.MethodPost)
 	router.HandleFunc("/updates/", handlers.UpdateMetricsBatchJSON).Methods(http.MethodPost)
