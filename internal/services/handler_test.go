@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"ypMetrics/internal/mocks"
+	"ypMetrics/internal/services/middlewares"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
@@ -91,7 +92,8 @@ func TestUpdateHandler(t *testing.T) {
 				Counters: make(map[string]int64),
 			}
 			service := NewMetricService(mockStorage, zerolog.New(io.Discard))
-			handler := NewHandler(service, zerolog.New(io.Discard))
+			ipCheckMiddleware := middlewares.NewIPCheckMiddleware("")
+			handler := NewHandler(service, zerolog.New(io.Discard), ipCheckMiddleware)
 			request, _ := http.NewRequest(http.MethodPost, "/update", nil)
 			record := httptest.NewRecorder()
 			vars := map[string]string{
@@ -120,7 +122,8 @@ func TestGetMetricHandler(t *testing.T) {
 		WithCounter("requests", 42)
 
 	service := NewMetricService(mockStorage, zerolog.New(io.Discard))
-	handler := NewHandler(service, zerolog.New(io.Discard))
+	ipCheckMiddleware := middlewares.NewIPCheckMiddleware("")
+	handler := NewHandler(service, zerolog.New(io.Discard), ipCheckMiddleware)
 
 	type want struct {
 		statusCode int

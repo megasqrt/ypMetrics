@@ -13,4 +13,5 @@ type Config struct {
 	HashKey         string
 	CryptoKey       string
 	ConfigPath      string
+	TrustedSubnet   string
 }
