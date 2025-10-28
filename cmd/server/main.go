@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"flag"
+	"net"
 	"os/signal"
 	"syscall"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"ypMetrics/internal/helper"
 	"ypMetrics/internal/misc"
 	"ypMetrics/internal/services"
+	"ypMetrics/internal/services/middlewares"
 	"ypMetrics/internal/store"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -28,6 +30,7 @@ const (
 	defaultDatabaseDSN     = ""
 	defaultHashKey         = ""
 	defaultCryptoKey       = ""
+	defaultTrustedSubnet   = ""
 	defaultConfigPath      = ""
 )
 
@@ -42,6 +45,7 @@ func parseConfig(log zerolog.Logger) misc.Config {
 	flag.StringVar(&cfg.DatabaseDSN, "d", defaultDatabaseDSN, "database DSN")
 	flag.StringVar(&cfg.HashKey, "k", defaultHashKey, "key for hashing")
 	flag.StringVar(&cfg.CryptoKey, "crypto-key", defaultCryptoKey, "path to private key file")
+	flag.StringVar(&cfg.TrustedSubnet, "t", defaultTrustedSubnet, "trusted subnet in CIDR format")
 	flag.StringVar(&cfg.ConfigPath, "c", defaultConfigPath, "path to config file")
 	flag.Parse()
 
@@ -69,6 +73,7 @@ func parseConfig(log zerolog.Logger) misc.Config {
 	helper.AssignFromViperIfSet(&cfg.DatabaseDSN, "DATABASE_DSN", viper.GetString, defaultDatabaseDSN)
 	helper.AssignFromViperIfSet(&cfg.HashKey, "KEY", viper.GetString, defaultHashKey)
 	helper.AssignFromViperIfSet(&cfg.CryptoKey, "CRYPTO_KEY", viper.GetString, defaultCryptoKey)
+	helper.AssignFromViperIfSet(&cfg.TrustedSubnet, "TRUSTED_SUBNET", viper.GetString, defaultTrustedSubnet)
 	helper.AssignFromViperIfSet(&cfg.ConfigPath, "CONFIG", viper.GetString, defaultConfigPath)
 
 	cfg.StoreInterval = time.Duration(storeInterval) * time.Second
@@ -120,7 +125,19 @@ func main() {
 		defer memStorage.SaveOnExit()
 	}
 
-	server := services.NewMetricServer(cfg, storage, log)
+	var ipCheckMiddleware *middlewares.IPCheckMiddleware
+	if cfg.TrustedSubnet != "" {
+		_, _, err := net.ParseCIDR(cfg.TrustedSubnet)
+		if err != nil {
+			log.Fatal().Err(err).Str("subnet", cfg.TrustedSubnet).Msg("Invalid trusted subnet CIDR")
+		}
+		ipCheckMiddleware = middlewares.NewIPCheckMiddleware(cfg.TrustedSubnet)
+		log.Info().Str("subnet", cfg.TrustedSubnet).Msg("IP address validation enabled for trusted subnet")
+	} else {
+		ipCheckMiddleware = middlewares.NewIPCheckMiddleware("")
+	}
+
+	server := services.NewMetricServer(cfg, storage, log, ipCheckMiddleware)
 
 	go func() {
 		log.Info().Msg("Starting pprof server on :6060")

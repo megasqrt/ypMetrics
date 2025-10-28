@@ -14,6 +14,7 @@ import (
 
 	"ypMetrics/internal/helper"
 	"ypMetrics/internal/mocks"
+	"ypMetrics/internal/services/middlewares"
 	"ypMetrics/models"
 
 	"github.com/rs/zerolog"
@@ -86,7 +87,8 @@ func TestUpdateMetricJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Создаем логгер, который ничего не выводит, для чистоты тестов
 			service := NewMetricService(tt.initialStorage, zerolog.New(io.Discard))
-			handler := NewHandler(service, zerolog.New(io.Discard))
+			ipCheckMiddleware := middlewares.NewIPCheckMiddleware("")
+			handler := NewHandler(service, zerolog.New(io.Discard), ipCheckMiddleware)
 
 			body, err := json.Marshal(tt.requestMetric)
 			require.NoError(t, err)
@@ -146,7 +148,8 @@ func TestUpdateMetricJSON_InvalidData(t *testing.T) {
 			resp := httptest.NewRecorder()
 
 			service := NewMetricService(&mocks.MockStorage{}, zerolog.New(io.Discard))
-			handler := NewHandler(service, zerolog.New(io.Discard))
+			ipCheckMiddleware := middlewares.NewIPCheckMiddleware("")
+			handler := NewHandler(service, zerolog.New(io.Discard), ipCheckMiddleware)
 			handler.UpdateMetricJSON(resp, req)
 
 			assert.Equal(t, tt.expected, resp.Code)
@@ -205,7 +208,8 @@ func TestGetMetricJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service := NewMetricService(storage, zerolog.New(io.Discard))
-			handler := NewHandler(service, zerolog.New(io.Discard))
+			ipCheckMiddleware := middlewares.NewIPCheckMiddleware("")
+			handler := NewHandler(service, zerolog.New(io.Discard), ipCheckMiddleware)
 			body, err := json.Marshal(tt.requestMetric)
 			require.NoError(t, err)
 			req, err := http.NewRequest(http.MethodPost, "/value/", bytes.NewBuffer(body))

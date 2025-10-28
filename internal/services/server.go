@@ -11,20 +11,22 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func NewMetricServer(cfg misc.Config, s store.Storage, log zerolog.Logger) *http.Server {
+func NewMetricServer(cfg misc.Config, s store.Storage, log zerolog.Logger, ipCheckMiddleware *middlewares.IPCheckMiddleware) *http.Server {
 	metricService := NewMetricService(s, log)
-	handlers := NewHandler(metricService, log)
+	handlers := NewHandler(metricService, log, ipCheckMiddleware)
 
 	router := mux.NewRouter()
 	HashMiddleware := middlewares.NewHashMiddleware(cfg.HashKey)
 	CryptoMiddleware, err := middlewares.NewCryptoMiddleware(cfg.CryptoKey)
+
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create crypto middleware")
 	}
-	router.Use(middlewares.GzipMiddleware, CryptoMiddleware.CryptoMiddleware, HashMiddleware.HashMiddleware, middlewares.LoggingMiddleware)
+	router.Use(middlewares.GzipMiddleware, CryptoMiddleware.CryptoMiddleware, HashMiddleware.HashMiddleware, middlewares.LoggingMiddleware, ipCheckMiddleware.Middleware)
 
 	router.HandleFunc("/update/", handlers.UpdateMetricJSON).Methods(http.MethodPost)
 	router.HandleFunc("/updates/", handlers.UpdateMetricsBatchJSON).Methods(http.MethodPost)
+
 	router.HandleFunc("/value/", handlers.GetMetricJSON).Methods(http.MethodPost)
 
 	router.HandleFunc("/update/{type}/{value}", handlers.errorHandler).Methods(http.MethodPost)
