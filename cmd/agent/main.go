@@ -122,43 +122,51 @@ func (a *MetricsAgent) Run(ctx context.Context) {
 }
 
 var (
-	serverAddress  string
-	reportInterval int
-	pollInterval   int
-	hashKey        string
-	rateLimit      int
-	cryptoKey      string
-	configPath     string
+	serverAddress     string
+	grpcServerAddress string
+	reportInterval    int
+	pollInterval      int
+	hashKey           string
+	rateLimit         int
+	cryptoKey         string
+	configPath        string
+	useGRPC           bool
 )
 
 type config struct {
-	serverAddress  string
-	pollInterval   time.Duration
-	reportInterval time.Duration
-	hashKey        string
-	rateLimit      int
-	cryptoKey      string
-	configPath     string
+	serverAddress     string
+	grpcServerAddress string
+	pollInterval      time.Duration
+	reportInterval    time.Duration
+	hashKey           string
+	rateLimit         int
+	cryptoKey         string
+	configPath        string
+	useGRPC           bool
 }
 
 const (
-	defaultServerAddress  = "localhost:8080"
-	defaultReportInterval = 10
-	defaultPollInterval   = 2
-	defaultHashKey        = ""
-	defaultRateLimit      = 1
-	defaultCryptoKey      = ""
-	defaultConfigPath     = ""
+	defaultServerAddress     = "localhost:8080"
+	defaultGrpcServerAddress = "localhost:9090"
+	defaultReportInterval    = 10
+	defaultPollInterval      = 2
+	defaultHashKey           = ""
+	defaultRateLimit         = 1
+	defaultCryptoKey         = ""
+	defaultConfigPath        = ""
+	defaultUseGRPC           = false
 )
 
 func registerFlags() {
 	flag.StringVar(&serverAddress, "a", defaultServerAddress, "server adress")
+	flag.StringVar(&grpcServerAddress, "ga", defaultGrpcServerAddress, "grpc server adress")
 	flag.IntVar(&reportInterval, "r", defaultReportInterval, "report interval")
 	flag.IntVar(&pollInterval, "p", defaultPollInterval, "poll interval")
 	flag.StringVar(&hashKey, "k", defaultHashKey, "key for hashing")
 	flag.IntVar(&rateLimit, "l", defaultRateLimit, "rate limit for concurrent requests")
 	flag.StringVar(&cryptoKey, "crypto-key", defaultCryptoKey, "path to public key file")
 	flag.StringVar(&configPath, "c", defaultConfigPath, "path to config file")
+	flag.BoolVar(&useGRPC, "gc", defaultUseGRPC, "use grpc for communication")
 }
 
 func init() {
@@ -184,25 +192,29 @@ func parseConfig() config {
 	viper.AutomaticEnv()
 
 	helper.AssignFromViperIfSet(&serverAddress, "ADDRESS", viper.GetString, defaultServerAddress)
+	helper.AssignFromViperIfSet(&grpcServerAddress, "GRPC_ADDRESS", viper.GetString, defaultGrpcServerAddress)
 	helper.AssignFromViperIfSet(&reportInterval, "REPORT_INTERVAL", viper.GetInt, defaultReportInterval)
 	helper.AssignFromViperIfSet(&pollInterval, "POLL_INTERVAL", viper.GetInt, defaultPollInterval)
 	helper.AssignFromViperIfSet(&hashKey, "KEY", viper.GetString, defaultHashKey)
 	helper.AssignFromViperIfSet(&rateLimit, "RATE_LIMIT", viper.GetInt, defaultRateLimit)
 	helper.AssignFromViperIfSet(&cryptoKey, "CRYPTO_KEY", viper.GetString, defaultCryptoKey)
 	helper.AssignFromViperIfSet(&configPath, "CONFIG", viper.GetString, defaultConfigPath)
+	helper.AssignFromViperIfSet(&useGRPC, "USE_GRPC", viper.GetBool, defaultUseGRPC)
 
-	if !govalidator.IsURL(serverAddress) {
+	if !useGRPC && !govalidator.IsURL(grpcServerAddress) {
 		log.Fatalf("некорректный URL сервера: %s", serverAddress)
 	}
 
 	return config{
-		serverAddress:  serverAddress,
-		reportInterval: time.Duration(reportInterval) * time.Second,
-		pollInterval:   time.Duration(pollInterval) * time.Second,
-		hashKey:        hashKey,
-		rateLimit:      rateLimit,
-		cryptoKey:      cryptoKey,
-		configPath:     configPath,
+		serverAddress:     serverAddress,
+		grpcServerAddress: grpcServerAddress,
+		reportInterval:    time.Duration(reportInterval) * time.Second,
+		pollInterval:      time.Duration(pollInterval) * time.Second,
+		hashKey:           hashKey,
+		rateLimit:         rateLimit,
+		cryptoKey:         cryptoKey,
+		configPath:        configPath,
+		useGRPC:           useGRPC,
 	}
 }
 
@@ -212,7 +224,15 @@ func main() {
 
 	// Создание компонентов
 	collector := agent.NewMetricCollector()
-	reporter, err := agent.NewHTTPReporter(cfg.serverAddress, cfg.hashKey, cfg.cryptoKey)
+	var reporter agent.Reporter
+	var err error
+
+	if cfg.useGRPC {
+		reporter, err = agent.NewGRPCReporter(cfg.grpcServerAddress)
+	} else {
+		reporter, err = agent.NewHTTPReporter(cfg.serverAddress, cfg.hashKey, cfg.cryptoKey)
+	}
+
 	if err != nil {
 		log.Fatalf("Ошибка создания репортера: %v", err)
 	}

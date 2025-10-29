@@ -11,11 +11,15 @@ import (
 
 	"net/http"
 	_ "net/http/pprof"
+
+	"google.golang.org/grpc"
+
 	"ypMetrics/internal/helper"
 	"ypMetrics/internal/misc"
 	"ypMetrics/internal/services"
 	"ypMetrics/internal/services/middlewares"
 	"ypMetrics/internal/store"
+	pb "ypMetrics/proto"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/rs/zerolog"
@@ -23,15 +27,16 @@ import (
 )
 
 const (
-	defaultServerAddress   = "localhost:8080"
-	defaultStoreInterval   = 300
-	defaultFileStoragePath = "/tmp/metrics-db.json"
-	defaultRestore         = true
-	defaultDatabaseDSN     = ""
-	defaultHashKey         = ""
-	defaultCryptoKey       = ""
-	defaultTrustedSubnet   = ""
-	defaultConfigPath      = ""
+	defaultServerAddress      = "localhost:8080"
+	defaultGRPCServerAddress  = ""
+	defaultStoreInterval      = 300
+	defaultFileStoragePath    = "/tmp/metrics-db.json"
+	defaultRestore            = true
+	defaultDatabaseDSN        = ""
+	defaultHashKey            = ""
+	defaultCryptoKey          = ""
+	defaultTrustedSubnet      = ""
+	defaultConfigPath         = ""
 )
 
 func parseConfig(log zerolog.Logger) misc.Config {
@@ -39,6 +44,7 @@ func parseConfig(log zerolog.Logger) misc.Config {
 	var storeInterval int
 
 	flag.StringVar(&cfg.ServerAddress, "a", defaultServerAddress, "server address")
+	flag.StringVar(&cfg.GRPCServerAddress, "ga", defaultGRPCServerAddress, "grpc server address")
 	flag.IntVar(&storeInterval, "i", int(defaultStoreInterval), "store interval in seconds")
 	flag.StringVar(&cfg.FileStoragePath, "f", defaultFileStoragePath, "file storage path")
 	flag.BoolVar(&cfg.Restore, "r", defaultRestore, "restore from file on start")
@@ -67,6 +73,7 @@ func parseConfig(log zerolog.Logger) misc.Config {
 	viper.AutomaticEnv()
 
 	helper.AssignFromViperIfSet(&cfg.ServerAddress, "ADDRESS", viper.GetString, defaultServerAddress)
+	helper.AssignFromViperIfSet(&cfg.GRPCServerAddress, "GRPC_ADDRESS", viper.GetString, defaultGRPCServerAddress)
 	helper.AssignFromViperIfSet(&storeInterval, "STORE_INTERVAL", viper.GetInt, defaultStoreInterval)
 	helper.AssignFromViperIfSet(&cfg.FileStoragePath, "FILE_STORAGE_PATH", viper.GetString, defaultFileStoragePath)
 	helper.AssignFromViperIfSet(&cfg.Restore, "RESTORE", viper.GetBool, defaultRestore)
@@ -135,6 +142,21 @@ func main() {
 		log.Info().Str("subnet", cfg.TrustedSubnet).Msg("IP address validation enabled for trusted subnet")
 	} else {
 		ipCheckMiddleware = middlewares.NewIPCheckMiddleware("")
+	}
+
+	if cfg.GRPCServerAddress != "" {
+		go func() {
+			listen, err := net.Listen("tcp", cfg.GRPCServerAddress)
+			if err != nil {
+				log.Fatal().Err(err).Msg("Failed to listen for gRPC")
+			}
+			s := grpc.NewServer()
+			pb.RegisterMetricsServer(s, services.NewMetricGRPCServer(storage, log))
+			log.Info().Str("address", cfg.GRPCServerAddress).Msg("Starting gRPC server")
+			if err := s.Serve(listen); err != nil {
+				log.Fatal().Err(err).Msg("gRPC server error")
+			}
+		}()
 	}
 
 	server := services.NewMetricServer(cfg, storage, log, ipCheckMiddleware)

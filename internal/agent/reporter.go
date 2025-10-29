@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -19,12 +20,75 @@ import (
 	"syscall"
 	"time"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	"ypMetrics/internal/helper"
 	"ypMetrics/models"
+	pb "ypMetrics/proto"
 )
 
 type Reporter interface {
 	Report(metrics []models.Metrics) error
+}
+
+type GRPCReporter struct {
+	client pb.MetricsClient
+	conn   *grpc.ClientConn
+}
+
+func NewGRPCReporter(serverAddress string) (*GRPCReporter, error) {
+	conn, err := grpc.NewClient(serverAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, fmt.Errorf("не удалось подключиться к gRPC серверу: %w", err)
+	}
+
+	client := pb.NewMetricsClient(conn)
+
+	return &GRPCReporter{
+		client: client,
+		conn:   conn,
+	}, nil
+}
+
+func (r *GRPCReporter) Report(metrics []models.Metrics) error {
+	if len(metrics) == 0 {
+		return nil
+	}
+
+	stream, err := r.client.Update(context.Background())
+	if err != nil {
+		return fmt.Errorf("не удалось создать gRPC stream: %w", err)
+	}
+
+	for _, m := range metrics {
+		pbMetric := &pb.Metric{
+			Id:   m.ID,
+			Type: m.MType,
+		}
+
+		switch m.MType {
+		case "gauge":
+			if m.Value != nil {
+				pbMetric.Value = *m.Value
+			}
+		case "counter":
+			if m.Delta != nil {
+				pbMetric.Delta = *m.Delta
+			}
+		}
+
+		if err := stream.Send(pbMetric); err != nil {
+			return fmt.Errorf("ошибка отправки метрики по gRPC stream: %w", err)
+		}
+	}
+
+	_, err = stream.CloseAndRecv()
+	if err != nil {
+		return fmt.Errorf("ошибка при закрытии gRPC stream: %w", err)
+	}
+
+	return nil
 }
 
 type HTTPReporter struct {

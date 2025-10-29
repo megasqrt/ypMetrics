@@ -1,6 +1,9 @@
 
 SERVER_PORT=8080
+GRPC_PORT=9090
 ADDRESS=localhost:${SERVER_PORT}
+GRPC_ADDRESS=localhost:${GRPC_PORT}
+USE_GRPC=true
 TEMP_FILE=$(random tempfile)
 KEY=secretKey
 REPORT_INTERVAL=5
