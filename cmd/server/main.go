@@ -150,7 +150,7 @@ func main() {
 			if err != nil {
 				log.Fatal().Err(err).Msg("Failed to listen for gRPC")
 			}
-			s := grpc.NewServer()
+			s := grpc.NewServer(grpc.StreamInterceptor(middlewares.GrpcCheckMiddleware(cfg.TrustedSubnet)))
 			pb.RegisterMetricsServer(s, services.NewMetricGRPCServer(storage, log))
 			log.Info().Str("address", cfg.GRPCServerAddress).Msg("Starting gRPC server")
 			if err := s.Serve(listen); err != nil {
