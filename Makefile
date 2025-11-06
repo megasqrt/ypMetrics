@@ -1,4 +1,3 @@
-
 SERVER_PORT=8080
 GRPC_PORT=9090
 ADDRESS=localhost:${SERVER_PORT}
@@ -54,5 +53,7 @@ fmtall:
 
 godoc:
 	godoc -http=:6070 -goroot="/home/kan/src/ypMetrics/" -play
-
 #http://localhost:6070/pkg/ypMetrics/internal/?m=all
+
+protoc:
+	protoc --go_out=. --go_opt=default_api_level=API_HYBRID --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/metrics.proto

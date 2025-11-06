@@ -41,22 +41,22 @@ func (s *MetricGRPCServer) Update(stream pb.Metrics_UpdateServer) error {
 		}
 
 		s.log.Info().
-			Str("id", metric.Id).
-			Str("type", metric.Type).
+			Str("id", metric.GetId()).
+			Str("type", metric.GetType()).
 			Msg("Received metric via gRPC")
 
 		m := models.Metrics{
-			ID:    metric.Id,
-			MType: metric.Type,
+			ID:    metric.GetId(),
+			MType: metric.GetType(),
 		}
 
-		switch metric.Type {
+		switch metric.GetType() {
 		case "gauge":
-			m.Value = &metric.Value
+			m.Value = metric.Value
 		case "counter":
-			m.Delta = &metric.Delta
+			m.Delta = metric.Delta
 		default:
-			s.log.Warn().Str("type", metric.Type).Msg("Unknown metric type received via gRPC")
+			s.log.Warn().Str("type", metric.GetType()).Msg("Unknown metric type received via gRPC")
 			continue
 		}
 		metricsToUpdate = append(metricsToUpdate, m)
