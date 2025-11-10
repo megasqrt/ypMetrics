@@ -27,16 +27,16 @@ import (
 )
 
 const (
-	defaultServerAddress      = "localhost:8080"
-	defaultGRPCServerAddress  = ""
-	defaultStoreInterval      = 300
-	defaultFileStoragePath    = "/tmp/metrics-db.json"
-	defaultRestore            = true
-	defaultDatabaseDSN        = ""
-	defaultHashKey            = ""
-	defaultCryptoKey          = ""
-	defaultTrustedSubnet      = ""
-	defaultConfigPath         = ""
+	defaultServerAddress     = "localhost:8080"
+	defaultGRPCServerAddress = ""
+	defaultStoreInterval     = 300
+	defaultFileStoragePath   = "/tmp/metrics-db.json"
+	defaultRestore           = true
+	defaultDatabaseDSN       = ""
+	defaultHashKey           = ""
+	defaultCryptoKey         = ""
+	defaultTrustedSubnet     = ""
+	defaultConfigPath        = ""
 )
 
 func parseConfig(log zerolog.Logger) misc.Config {
@@ -132,17 +132,16 @@ func main() {
 		defer memStorage.SaveOnExit()
 	}
 
-	var ipCheckMiddleware *middlewares.IPCheckMiddleware
-	if cfg.TrustedSubnet != "" {
-		_, _, err := net.ParseCIDR(cfg.TrustedSubnet)
-		if err != nil {
-			log.Fatal().Err(err).Str("subnet", cfg.TrustedSubnet).Msg("Invalid trusted subnet CIDR")
-		}
-		ipCheckMiddleware = middlewares.NewIPCheckMiddleware(cfg.TrustedSubnet)
-		log.Info().Str("subnet", cfg.TrustedSubnet).Msg("IP address validation enabled for trusted subnet")
-	} else {
-		ipCheckMiddleware = middlewares.NewIPCheckMiddleware("")
+	ipChecker, err := middlewares.NewIPChecker(cfg.TrustedSubnet)
+	if err != nil {
+		log.Fatal().Err(err).Str("subnet", cfg.TrustedSubnet).Msg("Invalid trusted subnet CIDR")
 	}
+
+	if cfg.TrustedSubnet != "" {
+		log.Info().Str("subnet", cfg.TrustedSubnet).Msg("IP address validation enabled for trusted subnet")
+	}
+
+	ipCheckMiddleware := middlewares.NewIPCheckMiddleware(ipChecker)
 
 	if cfg.GRPCServerAddress != "" {
 		go func() {
@@ -150,7 +149,7 @@ func main() {
 			if err != nil {
 				log.Fatal().Err(err).Msg("Failed to listen for gRPC")
 			}
-			s := grpc.NewServer(grpc.StreamInterceptor(middlewares.GrpcCheckMiddleware(cfg.TrustedSubnet)))
+			s := grpc.NewServer(grpc.StreamInterceptor(middlewares.GrpcCheckMiddleware(ipChecker)))
 			pb.RegisterMetricsServer(s, services.NewMetricGRPCServer(storage, log))
 			log.Info().Str("address", cfg.GRPCServerAddress).Msg("Starting gRPC server")
 			if err := s.Serve(listen); err != nil {

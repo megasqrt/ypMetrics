@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -87,7 +88,11 @@ func TestUpdateMetricJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Создаем логгер, который ничего не выводит, для чистоты тестов
 			service := NewMetricService(tt.initialStorage, zerolog.New(io.Discard))
-			ipCheckMiddleware := middlewares.NewIPCheckMiddleware("")
+			ipChecker, err := middlewares.NewIPChecker("")
+			if err != nil {
+				panic(fmt.Sprintf("failed to create ip checker for tests: %v", err))
+			}
+			ipCheckMiddleware := middlewares.NewIPCheckMiddleware(ipChecker)
 			handler := NewHandler(service, zerolog.New(io.Discard), ipCheckMiddleware)
 
 			body, err := json.Marshal(tt.requestMetric)
@@ -148,7 +153,11 @@ func TestUpdateMetricJSON_InvalidData(t *testing.T) {
 			resp := httptest.NewRecorder()
 
 			service := NewMetricService(&mocks.MockStorage{}, zerolog.New(io.Discard))
-			ipCheckMiddleware := middlewares.NewIPCheckMiddleware("")
+			ipChecker, err := middlewares.NewIPChecker("")
+			if err != nil {
+				panic(fmt.Sprintf("failed to create ip checker for tests: %v", err))
+			}
+			ipCheckMiddleware := middlewares.NewIPCheckMiddleware(ipChecker)
 			handler := NewHandler(service, zerolog.New(io.Discard), ipCheckMiddleware)
 			handler.UpdateMetricJSON(resp, req)
 
@@ -208,7 +217,11 @@ func TestGetMetricJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service := NewMetricService(storage, zerolog.New(io.Discard))
-			ipCheckMiddleware := middlewares.NewIPCheckMiddleware("")
+			ipChecker, err := middlewares.NewIPChecker("")
+			if err != nil {
+				panic(fmt.Sprintf("failed to create ip checker for tests: %v", err))
+			}
+			ipCheckMiddleware := middlewares.NewIPCheckMiddleware(ipChecker)
 			handler := NewHandler(service, zerolog.New(io.Discard), ipCheckMiddleware)
 			body, err := json.Marshal(tt.requestMetric)
 			require.NoError(t, err)

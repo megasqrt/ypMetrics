@@ -10,19 +10,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func GrpcCheckMiddleware(trustedSubnet string) grpc.StreamServerInterceptor {
-	if trustedSubnet == "" {
+func GrpcCheckMiddleware(checker *IPChecker) grpc.StreamServerInterceptor {
+	if checker.trustedSubnet == nil {
 		return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 			return handler(srv, ss)
 		}
 	}
-
-	_, subnet, err := net.ParseCIDR(trustedSubnet)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Invalid trusted subnet")
-		return nil
-	}
-
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		p, ok := peer.FromContext(ss.Context())
 		if !ok {
@@ -44,7 +37,7 @@ func GrpcCheckMiddleware(trustedSubnet string) grpc.StreamServerInterceptor {
 			return status.Errorf(codes.Internal, "could not parse peer IP address")
 		}
 
-		if !subnet.Contains(ip) {
+		if !checker.IsAllowed(ip) {
 			log.Warn().Str("ip", ip.String()).Msg("gRPC request from non-trusted IP")
 			return status.Error(codes.PermissionDenied, "forbidden")
 		}

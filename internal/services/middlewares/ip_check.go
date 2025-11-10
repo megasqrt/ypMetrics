@@ -1,47 +1,56 @@
 package middlewares
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 
 	"github.com/rs/zerolog/log"
 )
 
-type IPCheckMiddleware struct {
+// IPChecker инкапсулирует логику проверки IP-адреса на принадлежность к доверенной подсети.
+type IPChecker struct {
 	trustedSubnet *net.IPNet
 }
 
-func NewIPCheckMiddleware(trustedSubnetCIDR string) *IPCheckMiddleware {
+// NewIPChecker создает новый экземпляр IPChecker.
+func NewIPChecker(trustedSubnetCIDR string) (*IPChecker, error) {
 	if trustedSubnetCIDR == "" {
-		return &IPCheckMiddleware{trustedSubnet: nil}
+		return &IPChecker{trustedSubnet: nil}, nil
 	}
 
 	_, ipNet, err := net.ParseCIDR(trustedSubnetCIDR)
 	if err != nil {
-		// This should have been caught at startup, but we handle it defensively.
-		log.Fatal().Err(err).Msg("Failed to parse trusted subnet CIDR")
-		return &IPCheckMiddleware{trustedSubnet: nil}
+		return nil, fmt.Errorf("failed to parse trusted subnet CIDR: %w", err)
 	}
 
-	return &IPCheckMiddleware{trustedSubnet: ipNet}
+	return &IPChecker{trustedSubnet: ipNet}, nil
+}
+
+// IsAllowed проверяет, разрешен ли доступ для данного IP-адреса.
+func (ic *IPChecker) IsAllowed(ip net.IP) bool {
+	return ic.trustedSubnet == nil || (ip != nil && ic.trustedSubnet.Contains(ip))
+}
+
+type IPCheckMiddleware struct {
+	checker *IPChecker
+}
+
+func NewIPCheckMiddleware(checker *IPChecker) *IPCheckMiddleware {
+	return &IPCheckMiddleware{checker: checker}
 }
 
 func (icm *IPCheckMiddleware) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if icm.trustedSubnet == nil {
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		realIPStr := r.Header.Get("X-Real-IP")
-		if realIPStr == "" {
+		if icm.checker.trustedSubnet != nil && realIPStr == "" {
 			log.Warn().Msg("X-Real-IP header is missing, but trusted_subnet is configured. Denying access.")
 			http.Error(w, "Forbidden: X-Real-IP header is missing", http.StatusForbidden)
 			return
 		}
 
 		ip := net.ParseIP(realIPStr)
-		if ip == nil || !icm.trustedSubnet.Contains(ip) {
+		if !icm.checker.IsAllowed(ip) {
 			http.Error(w, "Forbidden: IP address not in trusted subnet", http.StatusForbidden)
 			return
 		}

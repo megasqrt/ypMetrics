@@ -23,7 +23,11 @@ func setupMuxRouter() (*Handler, *mux.Router) {
 		Counters: make(map[string]int64),
 	}
 	service := NewMetricService(mockStorage, zerolog.New(io.Discard))
-	ipCheckMiddleware := middlewares.NewIPCheckMiddleware("")
+	ipChecker, err := middlewares.NewIPChecker("")
+	if err != nil {
+		panic(fmt.Sprintf("failed to create ip checker for tests: %v", err))
+	}
+	ipCheckMiddleware := middlewares.NewIPCheckMiddleware(ipChecker)
 	handler := NewHandler(service, zerolog.New(io.Discard), ipCheckMiddleware)
 
 	router := mux.NewRouter()
