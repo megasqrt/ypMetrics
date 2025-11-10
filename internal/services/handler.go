@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"ypMetrics/internal/services/middlewares"
 	"ypMetrics/models"
 
 	"github.com/gorilla/mux"
@@ -11,15 +12,17 @@ import (
 )
 
 type Handler struct {
-	service *MetricService
-	log     zerolog.Logger
+	service           *MetricService
+	log               zerolog.Logger
+	ipCheckMiddleware *middlewares.IPCheckMiddleware
 }
 
 // NewHandler создает новый экземпляр Handler с предоставленным хранилищем.
-func NewHandler(service *MetricService, log zerolog.Logger) Handler {
+func NewHandler(service *MetricService, log zerolog.Logger, ipCheckMiddleware *middlewares.IPCheckMiddleware) Handler {
 	return Handler{
-		service: service,
-		log:     log,
+		service:           service,
+		log:               log,
+		ipCheckMiddleware: ipCheckMiddleware,
 	}
 }
 

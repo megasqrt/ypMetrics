@@ -1,0 +1,19 @@
+edition = "2023";
+
+package proto;
+
+option go_package = "ypMetrics/proto";
+
+service Metrics {
+  rpc Update(stream Metric) returns (UpdateResponse);
+}
+
+message Metric {
+  string id = 1;
+  string type = 2;
+  int64 delta = 3;
+  double value = 4;
+  string hash = 5;
+}
+
+message UpdateResponse {}

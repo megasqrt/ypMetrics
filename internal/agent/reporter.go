@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -19,12 +20,75 @@ import (
 	"syscall"
 	"time"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	"ypMetrics/internal/helper"
 	"ypMetrics/models"
+	pb "ypMetrics/proto"
 )
 
 type Reporter interface {
 	Report(metrics []models.Metrics) error
+}
+
+type GRPCReporter struct {
+	client pb.MetricsClient
+	conn   *grpc.ClientConn
+}
+
+func NewGRPCReporter(serverAddress string) (*GRPCReporter, error) {
+	conn, err := grpc.NewClient(serverAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, fmt.Errorf("не удалось подключиться к gRPC серверу: %w", err)
+	}
+
+	client := pb.NewMetricsClient(conn)
+
+	return &GRPCReporter{
+		client: client,
+		conn:   conn,
+	}, nil
+}
+
+func (r *GRPCReporter) Report(metrics []models.Metrics) error {
+	if len(metrics) == 0 {
+		return nil
+	}
+
+	stream, err := r.client.Update(context.Background())
+	if err != nil {
+		return fmt.Errorf("не удалось создать gRPC stream: %w", err)
+	}
+
+	for _, m := range metrics {
+		pbMetric := pb.Metric_builder{
+			Id:   &m.ID,
+			Type: &m.MType,
+		}.Build()
+
+		switch m.MType {
+		case "gauge":
+			if m.Value != nil {
+				pbMetric.SetValue(*m.Value)
+			}
+		case "counter":
+			if m.Delta != nil {
+				pbMetric.SetDelta(*m.Delta)
+			}
+		}
+
+		if err := stream.Send(pbMetric); err != nil {
+			return fmt.Errorf("ошибка отправки метрики по gRPC stream: %w", err)
+		}
+	}
+
+	_, err = stream.CloseAndRecv()
+	if err != nil {
+		return fmt.Errorf("ошибка при закрытии gRPC stream: %w", err)
+	}
+
+	return nil
 }
 
 type HTTPReporter struct {
@@ -34,6 +98,7 @@ type HTTPReporter struct {
 	mu            sync.Mutex
 	nextBatch     bool
 	publicKey     *rsa.PublicKey
+	localIP       string
 }
 
 func NewHTTPReporter(serverAddress string, hashKey string, cryptoKeyPath string) (*HTTPReporter, error) {
@@ -58,12 +123,21 @@ func NewHTTPReporter(serverAddress string, hashKey string, cryptoKeyPath string)
 		}
 	}
 
+	var localIP string
+	ip, err := getOutboundIP()
+	if err != nil {
+		log.Printf("Не удалось определить IP-адрес, заголовок X-Real-IP не будет установлен: %v", err)
+	} else {
+		localIP = ip.String()
+	}
+
 	return &HTTPReporter{
 		serverAddress: serverAddress,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
 		hashKey:   hashKey,
+		localIP:   localIP,
 		publicKey: publicKey,
 	}, nil
 }
@@ -156,13 +230,16 @@ func (r *HTTPReporter) sendGzippedJSON(url string, data interface{}) error {
 	}
 
 	retryErr := func() error {
-		//req, err := http.NewRequest(http.MethodPost, url, &buf)
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(buf.Bytes()))
 		if err != nil {
 			return fmt.Errorf("ошибка создания запроса: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
+
+		if r.localIP != "" {
+			req.Header.Set("X-Real-IP", r.localIP)
+		}
 
 		if r.hashKey != "" {
 			hash := helper.CalculateHashString(jsonData, r.hashKey)
@@ -211,4 +288,16 @@ func httpErrorIsRetryable(err error) bool {
 		return true
 	}
 	return false
+}
+
+func getOutboundIP() (net.IP, error) {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP, nil
 }

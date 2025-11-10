@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"ypMetrics/internal/mocks"
+	"ypMetrics/internal/services/middlewares"
 
 	"github.com/rs/zerolog"
 
@@ -22,7 +23,12 @@ func setupMuxRouter() (*Handler, *mux.Router) {
 		Counters: make(map[string]int64),
 	}
 	service := NewMetricService(mockStorage, zerolog.New(io.Discard))
-	handler := NewHandler(service, zerolog.New(io.Discard))
+	ipChecker, err := middlewares.NewIPChecker("")
+	if err != nil {
+		panic(fmt.Sprintf("failed to create ip checker for tests: %v", err))
+	}
+	ipCheckMiddleware := middlewares.NewIPCheckMiddleware(ipChecker)
+	handler := NewHandler(service, zerolog.New(io.Discard), ipCheckMiddleware)
 
 	router := mux.NewRouter()
 	router.HandleFunc("/update/{type}/{name}/{value}", handler.updateHandler).Methods(http.MethodPost)

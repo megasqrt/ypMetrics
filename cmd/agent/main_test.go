@@ -104,28 +104,42 @@ func TestParseConfig(t *testing.T) {
 		name              string
 		args              []string
 		env               map[string]string
-		expectedAddr      string
+		expected          config
 		expectedReport    time.Duration
 		expectedPoll      time.Duration
 		expectedRateLimit int
 	}{
 		{
-			name:              "default values",
-			args:              []string{"cmd"},
-			env:               nil,
-			expectedAddr:      "localhost:8080",
-			expectedReport:    10 * time.Second,
-			expectedPoll:      2 * time.Second,
-			expectedRateLimit: 1,
+			name: "default values",
+			args: []string{"cmd"},
+			env:  nil,
+			expected: config{
+				serverAddress:     defaultServerAddress,
+				grpcServerAddress: defaultGrpcServerAddress,
+				reportInterval:    defaultReportInterval * time.Second,
+				pollInterval:      defaultPollInterval * time.Second,
+				hashKey:           defaultHashKey,
+				rateLimit:         defaultRateLimit,
+				cryptoKey:         defaultCryptoKey,
+				configPath:        defaultConfigPath,
+				useGRPC:           defaultUseGRPC,
+			},
 		},
 		{
-			name:              "custom flag values",
-			args:              []string{"cmd", "-a=127.0.0.1:9090", "-r=5", "-p=1", "-l=3"},
-			env:               nil,
-			expectedAddr:      "127.0.0.1:9090",
-			expectedReport:    5 * time.Second,
-			expectedPoll:      1 * time.Second,
-			expectedRateLimit: 3,
+			name: "custom flag values",
+			args: []string{"cmd", "-a=127.0.0.1:9090", "-ga=localhost:9091", "-r=5", "-p=1", "-l=3", "-k=secret", "-crypto-key=/path/to/key", "-c=/etc/agent/config.json", "-gc=true"},
+			env:  nil,
+			expected: config{
+				serverAddress:     "127.0.0.1:9090",
+				grpcServerAddress: "localhost:9091",
+				reportInterval:    5 * time.Second,
+				pollInterval:      1 * time.Second,
+				hashKey:           "secret",
+				rateLimit:         3,
+				cryptoKey:         "/path/to/key",
+				configPath:        "/etc/agent/config.json",
+				useGRPC:           true,
+			},
 		},
 		{
 			name: "env values",
@@ -135,22 +149,44 @@ func TestParseConfig(t *testing.T) {
 				"REPORT_INTERVAL": "15",
 				"POLL_INTERVAL":   "3",
 				"RATE_LIMIT":      "5",
+				"GRPC_ADDRESS":    "env.grpc.host:1235",
+				"KEY":             "env-secret",
+				"CRYPTO_KEY":      "/env/key",
+				"CONFIG":          "/env/config.json",
+				"USE_GRPC":        "true",
 			},
-			expectedAddr:      "env.host:1234",
-			expectedReport:    15 * time.Second,
-			expectedPoll:      3 * time.Second,
-			expectedRateLimit: 5,
+			expected: config{
+				serverAddress:     "env.host:1234",
+				grpcServerAddress: "env.grpc.host:1235",
+				reportInterval:    15 * time.Second,
+				pollInterval:      3 * time.Second,
+				hashKey:           "env-secret",
+				rateLimit:         5,
+				cryptoKey:         "/env/key",
+				configPath:        "/env/config.json",
+				useGRPC:           true,
+			},
 		},
 		{
 			name: "flags override env values",
 			args: []string{"cmd", "-a=flag.host:5678"},
 			env: map[string]string{
-				"ADDRESS": "env.host:1234",
+				"ADDRESS":         "env.host:1234",
+				"REPORT_INTERVAL": "15",
+				"POLL_INTERVAL":   "3",
+				"RATE_LIMIT":      "5",
 			},
-			expectedAddr:      "flag.host:5678",
-			expectedReport:    10 * time.Second,
-			expectedPoll:      2 * time.Second,
-			expectedRateLimit: 1,
+			expected: config{
+				serverAddress:     "flag.host:5678",
+				grpcServerAddress: defaultGrpcServerAddress,
+				reportInterval:    15 * time.Second,
+				pollInterval:      3 * time.Second,
+				hashKey:           defaultHashKey,
+				rateLimit:         5,
+				cryptoKey:         defaultCryptoKey,
+				configPath:        defaultConfigPath,
+				useGRPC:           defaultUseGRPC,
+			},
 		},
 	}
 
@@ -166,10 +202,7 @@ func TestParseConfig(t *testing.T) {
 
 			cfg := parseConfig()
 
-			assert.Equal(t, tt.expectedAddr, cfg.serverAddress)
-			assert.Equal(t, tt.expectedReport, cfg.reportInterval)
-			assert.Equal(t, tt.expectedPoll, cfg.pollInterval)
-			assert.Equal(t, tt.expectedRateLimit, cfg.rateLimit)
+			assert.Equal(t, tt.expected, cfg)
 		})
 	}
 }
