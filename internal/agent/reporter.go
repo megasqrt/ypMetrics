@@ -62,19 +62,19 @@ func (r *GRPCReporter) Report(metrics []models.Metrics) error {
 	}
 
 	for _, m := range metrics {
-		pbMetric := &pb.Metric{
+		pbMetric := pb.Metric_builder{
 			Id:   &m.ID,
 			Type: &m.MType,
-		}
+		}.Build()
 
 		switch m.MType {
 		case "gauge":
 			if m.Value != nil {
-				pbMetric.Value = m.Value
+				pbMetric.SetValue(*m.Value)
 			}
 		case "counter":
 			if m.Delta != nil {
-				pbMetric.Delta = m.Delta
+				pbMetric.SetDelta(*m.Delta)
 			}
 		}
 

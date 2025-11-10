@@ -4,8 +4,6 @@
 // 	protoc        v6.33.0
 // source: proto/metrics.proto
 
-//go:build !protoopaque
-
 package proto
 
 import (
@@ -23,14 +21,16 @@ const (
 )
 
 type Metric struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Type          *string                `protobuf:"bytes,2,opt,name=type" json:"type,omitempty"`
-	Delta         *int64                 `protobuf:"varint,3,opt,name=delta" json:"delta,omitempty"`
-	Value         *float64               `protobuf:"fixed64,4,opt,name=value" json:"value,omitempty"`
-	Hash          *string                `protobuf:"bytes,5,opt,name=hash" json:"hash,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Id          *string                `protobuf:"bytes,1,opt,name=id"`
+	xxx_hidden_Type        *string                `protobuf:"bytes,2,opt,name=type"`
+	xxx_hidden_Delta       int64                  `protobuf:"varint,3,opt,name=delta"`
+	xxx_hidden_Value       float64                `protobuf:"fixed64,4,opt,name=value"`
+	xxx_hidden_Hash        *string                `protobuf:"bytes,5,opt,name=hash"`
+	XXX_raceDetectHookData protoimpl.RaceDetectHookData
+	XXX_presence           [1]uint32
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *Metric) Reset() {
@@ -59,113 +59,132 @@ func (x *Metric) ProtoReflect() protoreflect.Message {
 }
 
 func (x *Metric) GetId() string {
-	if x != nil && x.Id != nil {
-		return *x.Id
+	if x != nil {
+		if x.xxx_hidden_Id != nil {
+			return *x.xxx_hidden_Id
+		}
+		return ""
 	}
 	return ""
 }
 
 func (x *Metric) GetType() string {
-	if x != nil && x.Type != nil {
-		return *x.Type
+	if x != nil {
+		if x.xxx_hidden_Type != nil {
+			return *x.xxx_hidden_Type
+		}
+		return ""
 	}
 	return ""
 }
 
 func (x *Metric) GetDelta() int64 {
-	if x != nil && x.Delta != nil {
-		return *x.Delta
+	if x != nil {
+		return x.xxx_hidden_Delta
 	}
 	return 0
 }
 
 func (x *Metric) GetValue() float64 {
-	if x != nil && x.Value != nil {
-		return *x.Value
+	if x != nil {
+		return x.xxx_hidden_Value
 	}
 	return 0
 }
 
 func (x *Metric) GetHash() string {
-	if x != nil && x.Hash != nil {
-		return *x.Hash
+	if x != nil {
+		if x.xxx_hidden_Hash != nil {
+			return *x.xxx_hidden_Hash
+		}
+		return ""
 	}
 	return ""
 }
 
 func (x *Metric) SetId(v string) {
-	x.Id = &v
+	x.xxx_hidden_Id = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 5)
 }
 
 func (x *Metric) SetType(v string) {
-	x.Type = &v
+	x.xxx_hidden_Type = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 5)
 }
 
 func (x *Metric) SetDelta(v int64) {
-	x.Delta = &v
+	x.xxx_hidden_Delta = v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 5)
 }
 
 func (x *Metric) SetValue(v float64) {
-	x.Value = &v
+	x.xxx_hidden_Value = v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 5)
 }
 
 func (x *Metric) SetHash(v string) {
-	x.Hash = &v
+	x.xxx_hidden_Hash = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 4, 5)
 }
 
 func (x *Metric) HasId() bool {
 	if x == nil {
 		return false
 	}
-	return x.Id != nil
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
 }
 
 func (x *Metric) HasType() bool {
 	if x == nil {
 		return false
 	}
-	return x.Type != nil
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
 }
 
 func (x *Metric) HasDelta() bool {
 	if x == nil {
 		return false
 	}
-	return x.Delta != nil
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 2)
 }
 
 func (x *Metric) HasValue() bool {
 	if x == nil {
 		return false
 	}
-	return x.Value != nil
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 3)
 }
 
 func (x *Metric) HasHash() bool {
 	if x == nil {
 		return false
 	}
-	return x.Hash != nil
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 4)
 }
 
 func (x *Metric) ClearId() {
-	x.Id = nil
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
+	x.xxx_hidden_Id = nil
 }
 
 func (x *Metric) ClearType() {
-	x.Type = nil
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
+	x.xxx_hidden_Type = nil
 }
 
 func (x *Metric) ClearDelta() {
-	x.Delta = nil
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 2)
+	x.xxx_hidden_Delta = 0
 }
 
 func (x *Metric) ClearValue() {
-	x.Value = nil
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 3)
+	x.xxx_hidden_Value = 0
 }
 
 func (x *Metric) ClearHash() {
-	x.Hash = nil
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 4)
+	x.xxx_hidden_Hash = nil
 }
 
 type Metric_builder struct {
@@ -182,16 +201,31 @@ func (b0 Metric_builder) Build() *Metric {
 	m0 := &Metric{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Id = b.Id
-	x.Type = b.Type
-	x.Delta = b.Delta
-	x.Value = b.Value
-	x.Hash = b.Hash
+	if b.Id != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 5)
+		x.xxx_hidden_Id = b.Id
+	}
+	if b.Type != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 5)
+		x.xxx_hidden_Type = b.Type
+	}
+	if b.Delta != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 5)
+		x.xxx_hidden_Delta = *b.Delta
+	}
+	if b.Value != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 5)
+		x.xxx_hidden_Value = *b.Value
+	}
+	if b.Hash != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 4, 5)
+		x.xxx_hidden_Hash = b.Hash
+	}
 	return m0
 }
 
 type UpdateResponse struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

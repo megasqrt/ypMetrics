@@ -1,9 +1,10 @@
-
 package services
 
 import (
 	"io"
+
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -28,7 +29,7 @@ func NewMetricGRPCServer(storage store.Storage, log zerolog.Logger) *MetricGRPCS
 }
 
 // Update обрабатывает потоковую передачу метрик от агента.
-func (s *MetricGRPCServer) Update(stream pb.Metrics_UpdateServer) error {
+func (s *MetricGRPCServer) Update(stream grpc.ClientStreamingServer[pb.Metric, pb.UpdateResponse]) error {
 	var metricsToUpdate []models.Metrics
 	for {
 		metric, err := stream.Recv()
@@ -52,9 +53,11 @@ func (s *MetricGRPCServer) Update(stream pb.Metrics_UpdateServer) error {
 
 		switch metric.GetType() {
 		case "gauge":
-			m.Value = metric.Value
+			v := metric.GetValue()
+			m.Value = &v
 		case "counter":
-			m.Delta = metric.Delta
+			v := metric.GetDelta()
+			m.Delta = &v
 		default:
 			s.log.Warn().Str("type", metric.GetType()).Msg("Unknown metric type received via gRPC")
 			continue
